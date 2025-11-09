@@ -36,6 +36,11 @@ local function createFrame(parent, name, size, pos, color, borderSize)
 end
 
 local function createTextLabel(parent, name, text, size, pos, color)
+    -- 💥 ИСПРАВЛЕНО: Убедимся, что text — строка
+    if type(text) ~= "string" then
+        text = tostring(text) or ""
+    end
+
     local label = Instance.new("TextLabel")
     label.Name = name
     label.Text = text
@@ -317,6 +322,11 @@ local function createInputValue(parent, name, defaultValue, flag, callback)
 end
 
 local function createText(parent, text)
+    -- 💥 ИСПРАВЛЕНО: Убедимся, что text — строка
+    if type(text) ~= "string" then
+        text = tostring(text) or ""
+    end
+
     local textObj = createTextLabel(parent, "Text", text, 14, UDim2.new(0, 5, 0, 0))
     textObj.Size = UDim2.new(1, 0, 0, 20)
     textObj.TextXAlignment = Enum.TextXAlignment.Left
@@ -328,11 +338,15 @@ local Window = {}
 Window.__index = Window
 
 function Window.new(name, beta, gameName, toggleKey)
+    -- 💥 ИСПРАВЛЕНО: Убедимся, что name и gameName — строки
+    name = tostring(name) or "Menu"
+    gameName = tostring(gameName) or ""
+
     local self = setmetatable({}, Window)
 
     self.Name = name
     self.Beta = beta or false
-    self.Game = gameName or ""
+    self.Game = gameName
     self.ToggleKey = toggleKey or Enum.KeyCode.Insert
     self.Tabs = {}
     self.IsOpen = false
@@ -407,6 +421,11 @@ function Window:CreateTab(name)
             if #tab.Sections >= 4 then
                 warn("Maximum 4 sections per tab!")
                 return nil
+            end
+
+            -- 💥 ИСПРАВЛЕНО: Убедимся, что sectionName — строка
+            if type(sectionName) ~= "string" then
+                sectionName = tostring(sectionName) or "Unnamed Section"
             end
 
             local section = {
