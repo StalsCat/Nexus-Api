@@ -1,9 +1,9 @@
--- MenuAPI.lua
+-- NexusMenu.lua
 -- by Senior Lua Dev (Колин)
+-- Дизайн: SKETCH [beta] for Grand Theft Auto V
 
 local MenuAPI = {}
 
--- Глобальные переменные
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -13,17 +13,23 @@ local player = Players.LocalPlayer
 local guiParent = player:WaitForChild("PlayerGui") or Instance.new("PlayerGui")
 guiParent.Name = "PlayerGui"
 
--- Стандартные стили
+-- Цвета SKETCH
 local COLORS = {
-    Background = Color3.fromRGB(30, 30, 30),
+    Background = Color3.fromRGB(15, 15, 15),
     Accent = Color3.fromRGB(255, 50, 50),
     Text = Color3.fromRGB(255, 255, 255),
-    Border = Color3.fromRGB(50, 50, 50),
-    Hover = Color3.fromRGB(40, 40, 40),
+    Border = Color3.fromRGB(30, 30, 30),
+    Hover = Color3.fromRGB(25, 25, 25),
     Active = Color3.fromRGB(255, 70, 70),
+    SectionBackground = Color3.fromRGB(20, 20, 20),
 }
 
-local function createFrame(parent, name, size, pos, color, borderSize)
+-- Шрифты
+local FONT = Enum.Font.SourceSansBold
+local FONTSIZE = 14
+
+-- Создание фрейма
+local function createFrame(parent, name, size, pos, color, borderSize, cornerRadius)
     local frame = Instance.new("Frame")
     frame.Name = name
     frame.Size = size
@@ -32,27 +38,32 @@ local function createFrame(parent, name, size, pos, color, borderSize)
     frame.BorderSizePixel = borderSize or 0
     frame.BorderColor3 = COLORS.Border
     frame.Parent = parent
+
+    if cornerRadius then
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, cornerRadius)
+        corner.Parent = frame
+    end
+
     return frame
 end
 
-local function createTextLabel(parent, name, text, size, pos, color)
-    -- 💥 ИСПРАВЛЕНО: Убедимся, что text — строка
-    if type(text) ~= "string" then
-        text = tostring(text) or ""
-    end
-
+-- Создание текстовой метки
+local function createTextLabel(parent, name, text, size, pos, color, fontSize, font)
     local label = Instance.new("TextLabel")
     label.Name = name
     label.Text = text
     label.TextColor3 = color or COLORS.Text
-    label.TextSize = size
+    label.TextSize = fontSize or FONTSIZE
+    label.Font = font or FONT
     label.BackgroundTransparency = 1
     label.Position = pos
-    label.Size = UDim2.new(1, 0, 0, 20)
+    label.Size = size
     label.Parent = parent
     return label
 end
 
+-- Создание кнопки
 local function createButton(parent, name, size, pos, callback)
     local button = Instance.new("TextButton")
     button.Name = name
@@ -63,15 +74,30 @@ local function createButton(parent, name, size, pos, callback)
     button.BorderSizePixel = 1
     button.Text = name
     button.TextColor3 = COLORS.Text
-    button.TextSize = 14
+    button.TextSize = FONTSIZE
+    button.Font = FONT
     button.Parent = parent
 
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = button
+
+    local hover = false
+
     button.MouseEnter:Connect(function()
-        button.BackgroundColor3 = COLORS.Hover
+        hover = true
+        TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = COLORS.Hover,
+            BorderColor3 = COLORS.Accent
+        }):Play()
     end)
 
     button.MouseLeave:Connect(function()
-        button.BackgroundColor3 = COLORS.Background
+        hover = false
+        TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = COLORS.Background,
+            BorderColor3 = COLORS.Border
+        }):Play()
     end)
 
     button.MouseButton1Click:Connect(callback)
@@ -79,6 +105,7 @@ local function createButton(parent, name, size, pos, callback)
     return button
 end
 
+-- Создание переключателя
 local function createToggle(parent, name, value, flag, callback)
     local toggle = Instance.new("Frame")
     toggle.Name = name
@@ -88,8 +115,11 @@ local function createToggle(parent, name, value, flag, callback)
     toggle.BorderColor3 = COLORS.Border
     toggle.Parent = parent
 
-    local nameLabel = createTextLabel(toggle, "NameLabel", name, 14, UDim2.new(0, 5, 0, 0))
-    nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = toggle
+
+    local nameLabel = createTextLabel(toggle, "NameLabel", name, UDim2.new(0.7, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
 
     local switch = Instance.new("Frame")
     switch.Name = "Switch"
@@ -100,6 +130,10 @@ local function createToggle(parent, name, value, flag, callback)
     switch.BorderColor3 = COLORS.Border
     switch.Parent = toggle
 
+    local cornerSwitch = Instance.new("UICorner")
+    cornerSwitch.CornerRadius = UDim.new(0, 10)
+    cornerSwitch.Parent = switch
+
     local indicator = Instance.new("Frame")
     indicator.Name = "Indicator"
     indicator.Size = UDim2.new(0, 16, 0, 16)
@@ -107,6 +141,10 @@ local function createToggle(parent, name, value, flag, callback)
     indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     indicator.BorderSizePixel = 0
     indicator.Parent = switch
+
+    local cornerIndicator = Instance.new("UICorner")
+    cornerIndicator.CornerRadius = UDim.new(0, 8)
+    cornerIndicator.Parent = indicator
 
     local function updateToggle(newValue)
         value = newValue
@@ -130,6 +168,7 @@ local function createToggle(parent, name, value, flag, callback)
     }
 end
 
+-- Создание слайдера
 local function createSlider(parent, name, min, max, default, flag, callback)
     local slider = Instance.new("Frame")
     slider.Name = name
@@ -139,11 +178,13 @@ local function createSlider(parent, name, min, max, default, flag, callback)
     slider.BorderColor3 = COLORS.Border
     slider.Parent = parent
 
-    local nameLabel = createTextLabel(slider, "NameLabel", name, 14, UDim2.new(0, 5, 0, 0))
-    nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = slider
 
-    local valueLabel = createTextLabel(slider, "ValueLabel", tostring(default), 14, UDim2.new(0.9, -40, 0, 0))
-    valueLabel.Size = UDim2.new(0.1, 0, 1, 0)
+    local nameLabel = createTextLabel(slider, "NameLabel", name, UDim2.new(0.5, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
+
+    local valueLabel = createTextLabel(slider, "ValueLabel", tostring(default), UDim2.new(0.1, 0, 1, 0), UDim2.new(0.9, -40, 0, 0), COLORS.Text, FONTSIZE, FONT)
 
     local bar = Instance.new("Frame")
     bar.Name = "Bar"
@@ -153,12 +194,20 @@ local function createSlider(parent, name, min, max, default, flag, callback)
     bar.BorderSizePixel = 0
     bar.Parent = slider
 
+    local cornerBar = Instance.new("UICorner")
+    cornerBar.CornerRadius = UDim.new(0, 5)
+    cornerBar.Parent = bar
+
     local fill = Instance.new("Frame")
     fill.Name = "Fill"
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = COLORS.Accent
     fill.BorderSizePixel = 0
     fill.Parent = bar
+
+    local cornerFill = Instance.new("UICorner")
+    cornerFill.CornerRadius = UDim.new(0, 5)
+    cornerFill.Parent = fill
 
     local handle = Instance.new("Frame")
     handle.Name = "Handle"
@@ -167,6 +216,10 @@ local function createSlider(parent, name, min, max, default, flag, callback)
     handle.BorderSizePixel = 1
     handle.BorderColor3 = COLORS.Border
     handle.Parent = bar
+
+    local cornerHandle = Instance.new("UICorner")
+    cornerHandle.CornerRadius = UDim.new(0, 5)
+    cornerHandle.Parent = handle
 
     local currentValue = default
 
@@ -211,6 +264,7 @@ local function createSlider(parent, name, min, max, default, flag, callback)
     }
 end
 
+-- Создание привязки клавиши
 local function createKeyBind(parent, name, defaultKey, flag, callback)
     local keybind = Instance.new("Frame")
     keybind.Name = name
@@ -220,11 +274,13 @@ local function createKeyBind(parent, name, defaultKey, flag, callback)
     keybind.BorderColor3 = COLORS.Border
     keybind.Parent = parent
 
-    local nameLabel = createTextLabel(keybind, "NameLabel", name, 14, UDim2.new(0, 5, 0, 0))
-    nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = keybind
 
-    local keyLabel = createTextLabel(keybind, "KeyLabel", defaultKey.Name, 14, UDim2.new(0.9, -40, 0, 0))
-    keyLabel.Size = UDim2.new(0.1, 0, 1, 0)
+    local nameLabel = createTextLabel(keybind, "NameLabel", name, UDim2.new(0.5, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
+
+    local keyLabel = createTextLabel(keybind, "KeyLabel", defaultKey.Name, UDim2.new(0.1, 0, 1, 0), UDim2.new(0.9, -40, 0, 0), COLORS.Text, FONTSIZE, FONT)
 
     local currentKey = defaultKey
     local waitingForKey = false
@@ -272,6 +328,7 @@ local function createKeyBind(parent, name, defaultKey, flag, callback)
     }
 end
 
+-- Создание поля ввода
 local function createInputValue(parent, name, defaultValue, flag, callback)
     local input = Instance.new("Frame")
     input.Name = name
@@ -281,8 +338,11 @@ local function createInputValue(parent, name, defaultValue, flag, callback)
     input.BorderColor3 = COLORS.Border
     input.Parent = parent
 
-    local nameLabel = createTextLabel(input, "NameLabel", name, 14, UDim2.new(0, 5, 0, 0))
-    nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = input
+
+    local nameLabel = createTextLabel(input, "NameLabel", name, UDim2.new(0.5, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
 
     local textBox = Instance.new("TextBox")
     textBox.Name = "TextBox"
@@ -294,6 +354,10 @@ local function createInputValue(parent, name, defaultValue, flag, callback)
     textBox.Text = tostring(defaultValue)
     textBox.ClearTextOnFocus = false
     textBox.Parent = input
+
+    local cornerBox = Instance.new("UICorner")
+    cornerBox.CornerRadius = UDim.new(0, 5)
+    cornerBox.Parent = textBox
 
     local currentValue = defaultValue
 
@@ -321,14 +385,9 @@ local function createInputValue(parent, name, defaultValue, flag, callback)
     }
 end
 
+-- Создание текста
 local function createText(parent, text)
-    -- 💥 ИСПРАВЛЕНО: Убедимся, что text — строка
-    if type(text) ~= "string" then
-        text = tostring(text) or ""
-    end
-
-    local textObj = createTextLabel(parent, "Text", text, 14, UDim2.new(0, 5, 0, 0))
-    textObj.Size = UDim2.new(1, 0, 0, 20)
+    local textObj = createTextLabel(parent, "Text", text, UDim2.new(1, 0, 0, 20), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
     textObj.TextXAlignment = Enum.TextXAlignment.Left
     return textObj
 end
@@ -338,15 +397,11 @@ local Window = {}
 Window.__index = Window
 
 function Window.new(name, beta, gameName, toggleKey)
-    -- 💥 ИСПРАВЛЕНО: Убедимся, что name и gameName — строки
-    name = tostring(name) or "Menu"
-    gameName = tostring(gameName) or ""
-
     local self = setmetatable({}, Window)
 
     self.Name = name
     self.Beta = beta or false
-    self.Game = gameName
+    self.Game = gameName or ""
     self.ToggleKey = toggleKey or Enum.KeyCode.Insert
     self.Tabs = {}
     self.IsOpen = false
@@ -356,12 +411,12 @@ function Window.new(name, beta, gameName, toggleKey)
     self.Gui.Name = "Menu_" .. name
     self.Gui.Parent = guiParent
 
-    self.MainFrame = createFrame(self.Gui, "MainFrame", UDim2.new(0, 500, 0, 400), UDim2.new(0.5, -250, 0.5, -200), COLORS.Background, 1)
+    self.MainFrame = createFrame(self.Gui, "MainFrame", UDim2.new(0, 500, 0, 400), UDim2.new(0.5, -250, 0.5, -200), COLORS.Background, 1, 10)
     self.MainFrame.Visible = false
 
     -- Заголовок
-    self.TitleBar = createFrame(self.MainFrame, "TitleBar", UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0, 0), COLORS.Accent, 0)
-    local titleText = createTextLabel(self.TitleBar, "TitleText", self.Name .. (self.Beta and " [Beta]" or "") .. (self.Game ~= "" and " for " .. self.Game or ""), 16, UDim2.new(0, 10, 0, 0), Color3.fromRGB(0, 0, 0))
+    self.TitleBar = createFrame(self.MainFrame, "TitleBar", UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0, 0), COLORS.Accent, 0, 10)
+    local titleText = createTextLabel(self.TitleBar, "TitleText", self.Name .. (self.Beta and " [Beta]" or "") .. (self.Game ~= "" and " for " .. self.Game or ""), UDim2.new(1, 0, 1, 0), UDim2.new(0, 10, 0, 0), Color3.fromRGB(0, 0, 0), 16, FONT)
 
     -- Кнопка закрытия
     local closeBtn = createButton(self.TitleBar, "Close", UDim2.new(0, 20, 0, 20), UDim2.new(1, -30, 0, 5), function()
@@ -371,10 +426,10 @@ function Window.new(name, beta, gameName, toggleKey)
     closeBtn.TextSize = 14
 
     -- Левая панель вкладок
-    self.TabPanel = createFrame(self.MainFrame, "TabPanel", UDim2.new(0, 120, 1, -30), UDim2.new(0, 0, 0, 30), Color3.fromRGB(40, 40, 40), 1)
+    self.TabPanel = createFrame(self.MainFrame, "TabPanel", UDim2.new(0, 120, 1, -30), UDim2.new(0, 0, 0, 30), Color3.fromRGB(25, 25, 25), 1, 5)
 
     -- Правая панель контента
-    self.ContentPanel = createFrame(self.MainFrame, "ContentPanel", UDim2.new(1, -130, 1, -30), UDim2.new(0, 130, 0, 30), Color3.fromRGB(35, 35, 35), 1)
+    self.ContentPanel = createFrame(self.MainFrame, "ContentPanel", UDim2.new(1, -130, 1, -30), UDim2.new(0, 130, 0, 30), Color3.fromRGB(20, 20, 20), 1, 5)
 
     -- Обработчик нажатия клавиши
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -407,7 +462,7 @@ function Window:CreateTab(name)
     table.insert(self.Tabs, tab)
 
     -- Создаем контейнер для секций
-    local sectionContainer = createFrame(self.ContentPanel, "SectionContainer_" .. name, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), Color3.fromRGB(35, 35, 35), 0)
+    local sectionContainer = createFrame(self.ContentPanel, "SectionContainer_" .. name, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), Color3.fromRGB(20, 20, 20), 0, 5)
     sectionContainer.Visible = false
 
     tab.SectionContainer = sectionContainer
@@ -423,7 +478,7 @@ function Window:CreateTab(name)
                 return nil
             end
 
-            -- 💥 ИСПРАВЛЕНО: Убедимся, что sectionName — строка
+            -- Убедимся, что sectionName — строка
             if type(sectionName) ~= "string" then
                 sectionName = tostring(sectionName) or "Unnamed Section"
             end
@@ -434,10 +489,10 @@ function Window:CreateTab(name)
                 Index = #tab.Sections + 1,
             }
 
-            local sectionFrame = createFrame(sectionContainer, "Section_" .. sectionName, UDim2.new(1, -10, 0, 80), UDim2.new(0, 5, 0, 5 + 85 * (#tab.Sections)), Color3.fromRGB(45, 45, 45), 1)
+            local sectionFrame = createFrame(sectionContainer, "Section_" .. sectionName, UDim2.new(1, -10, 0, 80), UDim2.new(0, 5, 0, 5 + 85 * (#tab.Sections)), COLORS.SectionBackground, 1, 5)
 
-            local sectionTitle = createTextLabel(sectionFrame, "SectionTitle", sectionName, 14, UDim2.new(0, 5, 0, 0))
-            sectionTitle.Size = UDim2.new(1, -10, 0, 20)
+            local sectionTitle = createTextLabel(sectionFrame, "SectionTitle", sectionName, UDim2.new(1, -10, 0, 20), UDim2.new(0, 5, 0, 0), COLORS.Text, 14, FONT)
+            sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
 
             -- Размещаем элементы внутри секции
             local elementY = 25
