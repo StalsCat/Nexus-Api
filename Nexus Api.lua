@@ -36,17 +36,6 @@ NexusUI.DefaultColors = {
     Error = Color3.fromRGB(244, 67, 54)
 }
 
--- Key System Configuration
-NexusUI.DefaultKeySystem = {
-    Enabled = false,
-    ValidKeys = {
-        "NEXUS-1234-5678-9012",
-        "DEMO-KEY-2024-NEXUS", 
-        "PREMIUM-ACCESS-CODE",
-        "1234-5678-9012-3456"
-    }
-}
-
 -- Create new NexusUI instance
 function NexusUI.new(config)
     config = config or {}
@@ -60,7 +49,6 @@ function NexusUI.new(config)
             ToggleKey = config.ToggleKey or NexusUI.DefaultConfig.ToggleKey
         },
         Colors = config.Colors or NexusUI.DefaultColors,
-        KeySystem = config.KeySystem or NexusUI.DefaultKeySystem,
         Elements = {},
         Tabs = {},
         CurrentTab = nil,
@@ -76,18 +64,11 @@ end
 function NexusUI:Initialize()
     self:CreateBlurEffect()
     self:CreateMainUI()
-    self:CreateKeySystem()
     self:SetupEventHandlers()
-    
-    if self.KeySystem.Enabled and not self.KeySystem.CurrentKey then
-        self:ShowKeySystem()
-    else
-        self:ShowMainUI()
-    end
+    self:ShowMainUI()
     
     print("=== NEXUS UI LIBRARY ===")
     print("Version: 2.0")
-    print("Key System:", self.KeySystem.Enabled and "ENABLED" or "DISABLED")
     print("Toggle Key:", self.Config.ToggleKey.Name)
     print("========================")
 end
@@ -292,94 +273,8 @@ function NexusUI:CreateMainUI()
     self.startPos = nil
 end
 
--- Create key system UI
-function NexusUI:CreateKeySystem()
-    self.KeySystemUI = Instance.new("Frame")
-    self.KeySystemUI.Name = "KeySystem"
-    self.KeySystemUI.Size = UDim2.new(0, 400, 0, 300)
-    self.KeySystemUI.Position = UDim2.new(0.5, -200, 0.5, -150)
-    self.KeySystemUI.BackgroundColor3 = self.Colors.Background
-    self.KeySystemUI.BackgroundTransparency = 1
-    self.KeySystemUI.Visible = false
-    self.KeySystemUI.Parent = self.ScreenGui
-    
-    local KeySystemCorner = Instance.new("UICorner")
-    KeySystemCorner.CornerRadius = self.Config.CornerRadius
-    KeySystemCorner.Parent = self.KeySystemUI
-    
-    local KeySystemStroke = Instance.new("UIStroke")
-    KeySystemStroke.Color = self.Colors.SurfaceLight
-    KeySystemStroke.Thickness = 1
-    KeySystemStroke.Parent = self.KeySystemUI
-    
-    local KeyTitle = Instance.new("TextLabel")
-    KeyTitle.Name = "KeyTitle"
-    KeyTitle.Size = UDim2.new(1, 0, 0, 60)
-    KeyTitle.Position = UDim2.new(0, 0, 0, 0)
-    KeyTitle.BackgroundColor3 = self.Colors.Surface
-    KeyTitle.Text = "NEXUS KEY SYSTEM"
-    KeyTitle.TextColor3 = self.Colors.TextPrimary
-    KeyTitle.TextSize = 20
-    KeyTitle.Font = Enum.Font.GothamBold
-    KeyTitle.Parent = self.KeySystemUI
-    
-    local KeyTitleCorner = Instance.new("UICorner")
-    KeyTitleCorner.CornerRadius = UDim.new(0, 10)
-    KeyTitleCorner.Parent = KeyTitle
-    
-    self.KeyInput = Instance.new("TextBox")
-    self.KeyInput.Name = "KeyInput"
-    self.KeyInput.Size = UDim2.new(1, -40, 0, 40)
-    self.KeyInput.Position = UDim2.new(0, 20, 0, 80)
-    self.KeyInput.BackgroundColor3 = self.Colors.SurfaceLight
-    self.KeyInput.TextColor3 = self.Colors.TextPrimary
-    self.KeyInput.Text = ""
-    self.KeyInput.PlaceholderText = "Введите ключ доступа..."
-    self.KeyInput.TextSize = 14
-    self.KeyInput.Font = Enum.Font.Gotham
-    self.KeyInput.Parent = self.KeySystemUI
-    
-    local KeyInputCorner = Instance.new("UICorner")
-    KeyInputCorner.CornerRadius = self.Config.CornerRadius
-    KeyInputCorner.Parent = self.KeyInput
-    
-    self.KeySubmit = Instance.new("TextButton")
-    self.KeySubmit.Name = "KeySubmit"
-    self.KeySubmit.Size = UDim2.new(1, -40, 0, 40)
-    self.KeySubmit.Position = UDim2.new(0, 20, 0, 140)
-    self.KeySubmit.BackgroundColor3 = self.Colors.Primary
-    self.KeySubmit.TextColor3 = self.Colors.TextPrimary
-    self.KeySubmit.Text = "АКТИВИРОВАТЬ"
-    self.KeySubmit.TextSize = 16
-    self.KeySubmit.Font = Enum.Font.GothamBold
-    self.KeySubmit.Parent = self.KeySystemUI
-    
-    local KeySubmitCorner = Instance.new("UICorner")
-    KeySubmitCorner.CornerRadius = self.Config.CornerRadius
-    KeySubmitCorner.Parent = self.KeySubmit
-    
-    self.KeyMessage = Instance.new("TextLabel")
-    self.KeyMessage.Name = "KeyMessage"
-    self.KeyMessage.Size = UDim2.new(1, -40, 0, 40)
-    self.KeyMessage.Position = UDim2.new(0, 20, 0, 200)
-    self.KeyMessage.BackgroundTransparency = 1
-    self.KeyMessage.Text = "Доступные ключи будут показаны в консоли (F9)"
-    self.KeyMessage.TextColor3 = self.Colors.TextSecondary
-    self.KeyMessage.TextSize = 12
-    self.KeyMessage.Font = Enum.Font.Gotham
-    self.KeyMessage.TextWrapped = true
-    self.KeyMessage.Parent = self.KeySystemUI
-end
-
 -- Setup event handlers
 function NexusUI:SetupEventHandlers()
-    -- Key system events
-    if self.KeySubmit then
-        self.KeySubmit.MouseButton1Click:Connect(function()
-            self:OnKeySubmit()
-        end)
-    end
-    
     -- Dragging events
     if self.TopBar then
         self.TopBar.InputBegan:Connect(function(input)
@@ -422,11 +317,7 @@ function NexusUI:SetupEventHandlers()
         
         if input.KeyCode == self.Config.ToggleKey then
             if not self.Enabled then
-                if self.KeySystem.Enabled and not self.KeySystem.CurrentKey then
-                    self:ShowKeySystem()
-                else
-                    self:ShowMainUI()
-                end
+                self:ShowMainUI()
             else
                 self:HideMainUI()
             end
@@ -451,67 +342,6 @@ function NexusUI:UpdateInput(input)
         self.startPos.Y.Scale, 
         self.startPos.Y.Offset + delta.Y
     )
-end
-
--- Key system functions
-function NexusUI:ValidateKey(key)
-    key = string.upper(key)
-    for _, validKey in ipairs(self.KeySystem.ValidKeys) do
-        if key == validKey then
-            return true
-        end
-    end
-    return false
-end
-
-function NexusUI:OnKeySubmit()
-    local key = string.upper(self.KeyInput.Text)
-    
-    if self:ValidateKey(key) then
-        self.KeySystem.CurrentKey = key
-        self.KeyMessage.Text = "✅ Ключ принят! Загрузка..."
-        self.KeyMessage.TextColor3 = self.Colors.Success
-        
-        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Success}):Play()
-        
-        wait(1)
-        self:HideKeySystem()
-        self:ShowMainUI()
-    else
-        self.KeyMessage.Text = "❌ Неверный ключ! Попробуйте снова."
-        self.KeyMessage.TextColor3 = self.Colors.Error
-        
-        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Error}):Play()
-        wait(1)
-        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Primary}):Play()
-    end
-end
-
-function NexusUI:ShowKeySystem()
-    if not self.ScreenGui then return end
-    
-    self.ScreenGui.Enabled = true
-    self.KeySystemUI.Visible = true
-    self.KeySystemUI.BackgroundTransparency = 1
-    
-    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.5), {BackgroundTransparency = 0}):Play()
-    TweenService:Create(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount}):Play()
-    
-    -- Show available keys in console
-    print("=== NEXUS KEY SYSTEM ===")
-    print("Доступные ключи:")
-    for i, key in ipairs(self.KeySystem.ValidKeys) do
-        print(key)
-    end
-    print("========================")
-end
-
-function NexusUI:HideKeySystem()
-    if not self.KeySystemUI then return end
-    
-    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-    wait(0.3)
-    self.KeySystemUI.Visible = false
 end
 
 -- UI visibility management
@@ -621,7 +451,7 @@ function NexusUI:CreateTab(tabConfig)
         end)
     end
     
-    return {
+    local tabObject = {
         AddButton = function(buttonConfig)
             return self:AddButtonToTab(tabName, buttonConfig)
         end,
@@ -641,6 +471,16 @@ function NexusUI:CreateTab(tabConfig)
             return self:AddLabelToTab(tabName, labelConfig)
         end
     }
+    
+    -- Защита от nil методов
+    setmetatable(tabObject, {
+        __index = function(_, key)
+            warn("NexusUI: Method '" .. key .. "' is not available for tab '" .. tabName .. "'")
+            return function() end
+        end
+    })
+    
+    return tabObject
 end
 
 function NexusUI:SelectTab(tabName)
@@ -795,7 +635,10 @@ function NexusUI:CreateContentPage(pageConfig)
 end
 
 function NexusUI:AddSectionToTab(tabName, sectionConfig)
-    if not self.Tabs[tabName] then return nil end
+    if not self.Tabs[tabName] then 
+        warn("NexusUI: Tab '" .. tabName .. "' does not exist")
+        return nil
+    end
     
     -- Добавляем проверку на наличие Name в sectionConfig
     if not sectionConfig or not sectionConfig.Name then
@@ -845,7 +688,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Content = content
     })
     
-    return {
+    local sectionObject = {
         AddButton = function(buttonConfig)
             return self:AddButtonToSection(content, buttonConfig)
         end,
@@ -862,6 +705,16 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
             return self:AddLabelToSection(content, labelConfig)
         end
     }
+    
+    -- Защита от nil методов
+    setmetatable(sectionObject, {
+        __index = function(_, key)
+            warn("NexusUI: Method '" .. key .. "' is not available for section")
+            return function() end
+        end
+    })
+    
+    return sectionObject
 end
 
 function NexusUI:AddButtonToTab(tabName, buttonConfig)
