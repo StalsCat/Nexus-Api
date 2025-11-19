@@ -64,7 +64,8 @@ function NexusUI.new(config)
         Elements = {},
         Tabs = {},
         CurrentTab = nil,
-        Enabled = false
+        Enabled = false,
+        InputConnection = nil
     }, NexusUI)
     
     self:Initialize()
@@ -373,41 +374,47 @@ end
 -- Setup event handlers
 function NexusUI:SetupEventHandlers()
     -- Key system events
-    self.KeySubmit.MouseButton1Click:Connect(function()
-        self:OnKeySubmit()
-    end)
+    if self.KeySubmit then
+        self.KeySubmit.MouseButton1Click:Connect(function()
+            self:OnKeySubmit()
+        end)
+    end
     
     -- Dragging events
-    self.TopBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            self.dragging = true
-            self.dragStart = input.Position
-            self.startPos = self.MainWindow.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    self.dragging = false
-                end
-            end)
-        end
-    end)
-    
-    self.TopBar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            self.dragInput = input
-        end
-    end)
+    if self.TopBar then
+        self.TopBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                self.dragging = true
+                self.dragStart = input.Position
+                self.startPos = self.MainWindow.Position
+                
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        self.dragging = false
+                    end
+                end)
+            end
+        end)
+        
+        self.TopBar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement then
+                self.dragInput = input
+            end
+        end)
+    end
     
     UserInputService.InputChanged:Connect(function(input)
-        if input == self.dragInput and self.dragging then
+        if input == self.dragInput and self.dragging and self.MainWindow then
             self:UpdateInput(input)
         end
     end)
     
     -- Close button
-    self.CloseButton.MouseButton1Click:Connect(function()
-        self:HideMainUI()
-    end)
+    if self.CloseButton then
+        self.CloseButton.MouseButton1Click:Connect(function()
+            self:HideMainUI()
+        end)
+    end
     
     -- Toggle UI with key
     self.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -481,6 +488,8 @@ function NexusUI:OnKeySubmit()
 end
 
 function NexusUI:ShowKeySystem()
+    if not self.ScreenGui then return end
+    
     self.ScreenGui.Enabled = true
     self.KeySystemUI.Visible = true
     self.KeySystemUI.BackgroundTransparency = 1
@@ -498,6 +507,8 @@ function NexusUI:ShowKeySystem()
 end
 
 function NexusUI:HideKeySystem()
+    if not self.KeySystemUI then return end
+    
     TweenService:Create(self.KeySystemUI, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
     wait(0.3)
     self.KeySystemUI.Visible = false
@@ -602,11 +613,13 @@ function NexusUI:CreateTab(tabConfig)
     end
     
     -- Update navigation list size
-    self.NavigationLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        if self.NavigationList then
-            self.NavigationList.CanvasSize = UDim2.new(0, 0, 0, self.NavigationLayout.AbsoluteContentSize.Y)
-        end
-    end)
+    if self.NavigationLayout then
+        self.NavigationLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            if self.NavigationList then
+                self.NavigationList.CanvasSize = UDim2.new(0, 0, 0, self.NavigationLayout.AbsoluteContentSize.Y)
+            end
+        end)
+    end
     
     return {
         AddButton = function(buttonConfig)
@@ -893,7 +906,7 @@ function NexusUI:CreateButton(parent, buttonConfig)
     if buttonConfig.Callback then
         button.MouseButton1Click:Connect(function()
             pcall(buttonConfig.Callback)
-        end
+        end)
     end
     
     return button
@@ -1087,14 +1100,17 @@ end
 function NexusUI:Destroy()
     if self.InputConnection then
         self.InputConnection:Disconnect()
+        self.InputConnection = nil
     end
     
     if self.ScreenGui then
         self.ScreenGui:Destroy()
+        self.ScreenGui = nil
     end
     
     if self.BlurEffect then
         self.BlurEffect:Destroy()
+        self.BlurEffect = nil
     end
     
     -- Clean up tables
