@@ -797,6 +797,12 @@ end
 function NexusUI:AddSectionToTab(tabName, sectionConfig)
     if not self.Tabs[tabName] then return nil end
     
+    -- Добавляем проверку на наличие Name в sectionConfig
+    if not sectionConfig or not sectionConfig.Name then
+        warn("NexusUI: Section name is required")
+        return nil
+    end
+    
     local tab = self.Tabs[tabName]
     local section = self:CreateRoundedFrame(tab.Page, UDim2.new(1, 0, 0, 50), nil, self.Colors.Surface)
     section.BackgroundTransparency = 0
@@ -806,7 +812,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     title.Size = UDim2.new(1, -20, 0, 25)
     title.Position = UDim2.new(0, 15, 0, 12)
     title.BackgroundTransparency = 1
-    title.Text = sectionConfig.Name
+    title.Text = sectionConfig.Name or "Section" -- Защита от nil
     title.TextColor3 = self.Colors.TextPrimary
     title.TextSize = 14
     title.Font = Enum.Font.GothamBold
@@ -826,8 +832,10 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     contentLayout.Parent = content
     
     contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
-        section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
+        if content and content.Parent then
+            content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
+            section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
+        end
     end)
     
     -- Store section in tab elements
