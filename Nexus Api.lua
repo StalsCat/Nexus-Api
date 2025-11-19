@@ -1,569 +1,1130 @@
--- NexusMenu.lua
--- by Senior Lua Dev (Колин)
--- Дизайн: SKETCH [beta] for Grand Theft Auto V
+-- NexusUI Library v2.0
+-- Модульная библиотека для создания современных UI интерфейсов
 
-local MenuAPI = {}
+local NexusUI = {}
+NexusUI.__index = NexusUI
 
+-- Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
 
-local player = Players.LocalPlayer
-local guiParent = player:WaitForChild("PlayerGui") or Instance.new("PlayerGui")
-guiParent.Name = "PlayerGui"
-
--- Цвета SKETCH
-local COLORS = {
-    Background = Color3.fromRGB(15, 15, 15),
-    Accent = Color3.fromRGB(255, 50, 50),
-    Text = Color3.fromRGB(255, 255, 255),
-    Border = Color3.fromRGB(30, 30, 30),
-    Hover = Color3.fromRGB(25, 25, 25),
-    Active = Color3.fromRGB(255, 70, 70),
-    SectionBackground = Color3.fromRGB(20, 20, 20),
+-- Default Configuration
+NexusUI.DefaultConfig = {
+    WindowSize = UDim2.new(0, 750, 0, 500),
+    CornerRadius = UDim.new(0, 10),
+    AnimationDuration = 0.3,
+    BlurAmount = 5,
+    ToggleKey = Enum.KeyCode.Insert
 }
 
--- Шрифты
-local FONT = Enum.Font.SourceSansBold
-local FONTSIZE = 14
+-- Default Color Scheme
+NexusUI.DefaultColors = {
+    Primary = Color3.fromRGB(140, 100, 220),
+    PrimaryDark = Color3.fromRGB(110, 80, 190),
+    Secondary = Color3.fromRGB(40, 180, 220),
+    Background = Color3.fromRGB(20, 20, 25),
+    Surface = Color3.fromRGB(30, 30, 38),
+    SurfaceLight = Color3.fromRGB(45, 45, 55),
+    TextPrimary = Color3.fromRGB(255, 255, 255),
+    TextSecondary = Color3.fromRGB(180, 180, 190),
+    Success = Color3.fromRGB(76, 175, 80),
+    Warning = Color3.fromRGB(255, 193, 7),
+    Error = Color3.fromRGB(244, 67, 54)
+}
 
--- Создание фрейма
-local function createFrame(parent, name, size, pos, color, borderSize, cornerRadius)
-    local frame = Instance.new("Frame")
-    frame.Name = name
-    frame.Size = size
-    frame.Position = pos
-    frame.BackgroundColor3 = color or COLORS.Background
-    frame.BorderSizePixel = borderSize or 0
-    frame.BorderColor3 = COLORS.Border
-    frame.Parent = parent
-
-    if cornerRadius then
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, cornerRadius)
-        corner.Parent = frame
-    end
-
-    return frame
-end
-
--- Создание текстовой метки
-local function createTextLabel(parent, name, text, size, pos, color, fontSize, font)
-    local label = Instance.new("TextLabel")
-    label.Name = name
-    label.Text = text
-    label.TextColor3 = color or COLORS.Text
-    label.TextSize = fontSize or FONTSIZE
-    label.Font = font or FONT
-    label.BackgroundTransparency = 1
-    label.Position = pos
-    label.Size = size
-    label.Parent = parent
-    return label
-end
-
--- Создание кнопки
-local function createButton(parent, name, size, pos, callback)
-    local button = Instance.new("TextButton")
-    button.Name = name
-    button.Size = size
-    button.Position = pos
-    button.BackgroundColor3 = COLORS.Background
-    button.BorderColor3 = COLORS.Border
-    button.BorderSizePixel = 1
-    button.Text = name
-    button.TextColor3 = COLORS.Text
-    button.TextSize = FONTSIZE
-    button.Font = FONT
-    button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = button
-
-    local hover = false
-
-    button.MouseEnter:Connect(function()
-        hover = true
-        TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = COLORS.Hover,
-            BorderColor3 = COLORS.Accent
-        }):Play()
-    end)
-
-    button.MouseLeave:Connect(function()
-        hover = false
-        TweenService:Create(button, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundColor3 = COLORS.Background,
-            BorderColor3 = COLORS.Border
-        }):Play()
-    end)
-
-    button.MouseButton1Click:Connect(callback)
-
-    return button
-end
-
--- Создание переключателя
-local function createToggle(parent, name, value, flag, callback)
-    local toggle = Instance.new("Frame")
-    toggle.Name = name
-    toggle.Size = UDim2.new(1, 0, 0, 25)
-    toggle.BackgroundColor3 = COLORS.Background
-    toggle.BorderSizePixel = 1
-    toggle.BorderColor3 = COLORS.Border
-    toggle.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = toggle
-
-    local nameLabel = createTextLabel(toggle, "NameLabel", name, UDim2.new(0.7, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
-
-    local switch = Instance.new("Frame")
-    switch.Name = "Switch"
-    switch.Size = UDim2.new(0, 40, 0, 20)
-    switch.Position = UDim2.new(1, -45, 0, 2.5)
-    switch.BackgroundColor3 = value and COLORS.Accent or Color3.fromRGB(60, 60, 60)
-    switch.BorderSizePixel = 1
-    switch.BorderColor3 = COLORS.Border
-    switch.Parent = toggle
-
-    local cornerSwitch = Instance.new("UICorner")
-    cornerSwitch.CornerRadius = UDim.new(0, 10)
-    cornerSwitch.Parent = switch
-
-    local indicator = Instance.new("Frame")
-    indicator.Name = "Indicator"
-    indicator.Size = UDim2.new(0, 16, 0, 16)
-    indicator.Position = UDim2.new(value and 0.5 or 0, 2, 0, 2)
-    indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    indicator.BorderSizePixel = 0
-    indicator.Parent = switch
-
-    local cornerIndicator = Instance.new("UICorner")
-    cornerIndicator.CornerRadius = UDim.new(0, 8)
-    cornerIndicator.Parent = indicator
-
-    local function updateToggle(newValue)
-        value = newValue
-        switch.BackgroundColor3 = value and COLORS.Accent or Color3.fromRGB(60, 60, 60)
-        indicator.Position = UDim2.new(value and 0.5 or 0, 2, 0, 2)
-        callback(value)
-    end
-
-    switch.MouseButton1Click:Connect(function()
-        updateToggle(not value)
-    end)
-
-    return {
-        Set = function(newValue)
-            updateToggle(newValue)
-        end,
-        Get = function()
-            return value
-        end,
-        Flag = flag,
+-- Key System Configuration
+NexusUI.DefaultKeySystem = {
+    Enabled = false,
+    ValidKeys = {
+        "NEXUS-1234-5678-9012",
+        "DEMO-KEY-2024-NEXUS", 
+        "PREMIUM-ACCESS-CODE",
+        "1234-5678-9012-3456"
     }
-end
+}
 
--- Создание слайдера
-local function createSlider(parent, name, min, max, default, flag, callback)
-    local slider = Instance.new("Frame")
-    slider.Name = name
-    slider.Size = UDim2.new(1, 0, 0, 30)
-    slider.BackgroundColor3 = COLORS.Background
-    slider.BorderSizePixel = 1
-    slider.BorderColor3 = COLORS.Border
-    slider.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = slider
-
-    local nameLabel = createTextLabel(slider, "NameLabel", name, UDim2.new(0.5, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
-
-    local valueLabel = createTextLabel(slider, "ValueLabel", tostring(default), UDim2.new(0.1, 0, 1, 0), UDim2.new(0.9, -40, 0, 0), COLORS.Text, FONTSIZE, FONT)
-
-    local bar = Instance.new("Frame")
-    bar.Name = "Bar"
-    bar.Size = UDim2.new(0.7, 0, 0, 10)
-    bar.Position = UDim2.new(0.1, 0, 0.5, -5)
-    bar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    bar.BorderSizePixel = 0
-    bar.Parent = slider
-
-    local cornerBar = Instance.new("UICorner")
-    cornerBar.CornerRadius = UDim.new(0, 5)
-    cornerBar.Parent = bar
-
-    local fill = Instance.new("Frame")
-    fill.Name = "Fill"
-    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    fill.BackgroundColor3 = COLORS.Accent
-    fill.BorderSizePixel = 0
-    fill.Parent = bar
-
-    local cornerFill = Instance.new("UICorner")
-    cornerFill.CornerRadius = UDim.new(0, 5)
-    cornerFill.Parent = fill
-
-    local handle = Instance.new("Frame")
-    handle.Name = "Handle"
-    handle.Size = UDim2.new(0, 10, 0, 10)
-    handle.BackgroundColor3 = COLORS.Text
-    handle.BorderSizePixel = 1
-    handle.BorderColor3 = COLORS.Border
-    handle.Parent = bar
-
-    local cornerHandle = Instance.new("UICorner")
-    cornerHandle.CornerRadius = UDim.new(0, 5)
-    cornerHandle.Parent = handle
-
-    local currentValue = default
-
-    local function updateValue(newValue)
-        currentValue = math.clamp(newValue, min, max)
-        local percent = (currentValue - min) / (max - min)
-        fill.Size = UDim2.new(percent, 0, 1, 0)
-        handle.Position = UDim2.new(percent - 0.05, 0, 0, 0)
-        valueLabel.Text = tostring(math.floor(currentValue))
-        callback(currentValue)
-    end
-
-    updateValue(default)
-
-    local dragging = false
-    handle.MouseButton1Down:Connect(function()
-        dragging = true
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local x = input.Position.X - bar.AbsolutePosition.X
-            local percent = math.clamp(x / bar.AbsoluteSize.X, 0, 1)
-            updateValue(min + percent * (max - min))
-        end
-    end)
-
-    return {
-        Set = function(newValue)
-            updateValue(newValue)
-        end,
-        Get = function()
-            return currentValue
-        end,
-        Flag = flag,
-    }
-end
-
--- Создание привязки клавиши
-local function createKeyBind(parent, name, defaultKey, flag, callback)
-    local keybind = Instance.new("Frame")
-    keybind.Name = name
-    keybind.Size = UDim2.new(1, 0, 0, 25)
-    keybind.BackgroundColor3 = COLORS.Background
-    keybind.BorderSizePixel = 1
-    keybind.BorderColor3 = COLORS.Border
-    keybind.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = keybind
-
-    local nameLabel = createTextLabel(keybind, "NameLabel", name, UDim2.new(0.5, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
-
-    local keyLabel = createTextLabel(keybind, "KeyLabel", defaultKey.Name, UDim2.new(0.1, 0, 1, 0), UDim2.new(0.9, -40, 0, 0), COLORS.Text, FONTSIZE, FONT)
-
-    local currentKey = defaultKey
-    local waitingForKey = false
-
-    local function updateKey(newKey)
-        currentKey = newKey
-        keyLabel.Text = newKey.Name
-        callback(newKey)
-    end
-
-    keybind.MouseButton1Click:Connect(function()
-        if not waitingForKey then
-            waitingForKey = true
-            keyLabel.Text = "Press Key..."
-            keyLabel.TextColor3 = COLORS.Accent
-        end
-    end)
-
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if waitingForKey and not gameProcessed then
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                updateKey(input.KeyCode)
-                waitingForKey = false
-                keyLabel.TextColor3 = COLORS.Text
-            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-                updateKey(Enum.KeyCode.MouseButton1)
-                waitingForKey = false
-                keyLabel.TextColor3 = COLORS.Text
-            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-                updateKey(Enum.KeyCode.MouseButton2)
-                waitingForKey = false
-                keyLabel.TextColor3 = COLORS.Text
-            end
-        end
-    end)
-
-    return {
-        Set = function(newKey)
-            updateKey(newKey)
-        end,
-        Get = function()
-            return currentKey
-        end,
-        Flag = flag,
-    }
-end
-
--- Создание поля ввода
-local function createInputValue(parent, name, defaultValue, flag, callback)
-    local input = Instance.new("Frame")
-    input.Name = name
-    input.Size = UDim2.new(1, 0, 0, 25)
-    input.BackgroundColor3 = COLORS.Background
-    input.BorderSizePixel = 1
-    input.BorderColor3 = COLORS.Border
-    input.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = input
-
-    local nameLabel = createTextLabel(input, "NameLabel", name, UDim2.new(0.5, 0, 1, 0), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
-
-    local textBox = Instance.new("TextBox")
-    textBox.Name = "TextBox"
-    textBox.Size = UDim2.new(0.4, 0, 1, 0)
-    textBox.Position = UDim2.new(0.6, 0, 0, 0)
-    textBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    textBox.TextColor3 = COLORS.Text
-    textBox.PlaceholderText = "Enter value"
-    textBox.Text = tostring(defaultValue)
-    textBox.ClearTextOnFocus = false
-    textBox.Parent = input
-
-    local cornerBox = Instance.new("UICorner")
-    cornerBox.CornerRadius = UDim.new(0, 5)
-    cornerBox.Parent = textBox
-
-    local currentValue = defaultValue
-
-    textBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            local newValue = tonumber(textBox.Text) or currentValue
-            currentValue = newValue
-            textBox.Text = tostring(newValue)
-            callback(newValue)
-        else
-            textBox.Text = tostring(currentValue)
-        end
-    end)
-
-    return {
-        Set = function(newValue)
-            currentValue = newValue
-            textBox.Text = tostring(newValue)
-            callback(newValue)
-        end,
-        Get = function()
-            return currentValue
-        end,
-        Flag = flag,
-    }
-end
-
--- Создание текста
-local function createText(parent, text)
-    local textObj = createTextLabel(parent, "Text", text, UDim2.new(1, 0, 0, 20), UDim2.new(0, 5, 0, 0), COLORS.Text, FONTSIZE, FONT)
-    textObj.TextXAlignment = Enum.TextXAlignment.Left
-    return textObj
-end
-
--- Основной класс меню
-local Window = {}
-Window.__index = Window
-
-function Window.new(name, beta, gameName, toggleKey)
-    local self = setmetatable({}, Window)
-
-    self.Name = name
-    self.Beta = beta or false
-    self.Game = gameName or ""
-    self.ToggleKey = toggleKey or Enum.KeyCode.Insert
-    self.Tabs = {}
-    self.IsOpen = false
-
-    -- Создаем GUI
-    self.Gui = Instance.new("ScreenGui")
-    self.Gui.Name = "Menu_" .. name
-    self.Gui.Parent = guiParent
-
-    self.MainFrame = createFrame(self.Gui, "MainFrame", UDim2.new(0, 500, 0, 400), UDim2.new(0.5, -250, 0.5, -200), COLORS.Background, 1, 10)
-    self.MainFrame.Visible = false
-
-    -- Заголовок
-    self.TitleBar = createFrame(self.MainFrame, "TitleBar", UDim2.new(1, 0, 0, 30), UDim2.new(0, 0, 0, 0), COLORS.Accent, 0, 10)
-    local titleText = createTextLabel(self.TitleBar, "TitleText", self.Name .. (self.Beta and " [Beta]" or "") .. (self.Game ~= "" and " for " .. self.Game or ""), UDim2.new(1, 0, 1, 0), UDim2.new(0, 10, 0, 0), Color3.fromRGB(0, 0, 0), 16, FONT)
-
-    -- Кнопка закрытия
-    local closeBtn = createButton(self.TitleBar, "Close", UDim2.new(0, 20, 0, 20), UDim2.new(1, -30, 0, 5), function()
-        self:IsVisible(false)
-    end)
-    closeBtn.Text = "X"
-    closeBtn.TextSize = 14
-
-    -- Левая панель вкладок
-    self.TabPanel = createFrame(self.MainFrame, "TabPanel", UDim2.new(0, 120, 1, -30), UDim2.new(0, 0, 0, 30), Color3.fromRGB(25, 25, 25), 1, 5)
-
-    -- Правая панель контента
-    self.ContentPanel = createFrame(self.MainFrame, "ContentPanel", UDim2.new(1, -130, 1, -30), UDim2.new(0, 130, 0, 30), Color3.fromRGB(20, 20, 20), 1, 5)
-
-    -- Обработчик нажатия клавиши
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if input.KeyCode == self.ToggleKey and not gameProcessed then
-            self:IsVisible(not self.IsOpen)
-        end
-    end)
-
+-- Create new NexusUI instance
+function NexusUI.new(config)
+    config = config or {}
+    
+    local self = setmetatable({
+        Config = {
+            WindowSize = config.WindowSize or NexusUI.DefaultConfig.WindowSize,
+            CornerRadius = config.CornerRadius or NexusUI.DefaultConfig.CornerRadius,
+            AnimationDuration = config.AnimationDuration or NexusUI.DefaultConfig.AnimationDuration,
+            BlurAmount = config.BlurAmount or NexusUI.DefaultConfig.BlurAmount,
+            ToggleKey = config.ToggleKey or NexusUI.DefaultConfig.ToggleKey
+        },
+        Colors = config.Colors or NexusUI.DefaultColors,
+        KeySystem = config.KeySystem or NexusUI.DefaultKeySystem,
+        Elements = {},
+        Tabs = {},
+        CurrentTab = nil,
+        Enabled = false
+    }, NexusUI)
+    
+    self:Initialize()
     return self
 end
 
-function Window:IsVisible(visible)
-    self.IsOpen = visible
-    self.MainFrame.Visible = visible
+-- Initialize the UI
+function NexusUI:Initialize()
+    self:CreateBlurEffect()
+    self:CreateMainUI()
+    self:CreateKeySystem()
+    self:SetupEventHandlers()
+    
+    if self.KeySystem.Enabled and not self.KeySystem.CurrentKey then
+        self:ShowKeySystem()
+    else
+        self:ShowMainUI()
+    end
+    
+    print("=== NEXUS UI LIBRARY ===")
+    print("Version: 2.0")
+    print("Key System:", self.KeySystem.Enabled and "ENABLED" or "DISABLED")
+    print("Toggle Key:", self.Config.ToggleKey.Name)
+    print("========================")
 end
 
-function Window:CreateTab(name)
-    local tab = {
-        Name = name,
-        Sections = {},
-        Index = #self.Tabs + 1,
-    }
+-- Create blur effect
+function NexusUI:CreateBlurEffect()
+    self.BlurEffect = Instance.new("BlurEffect")
+    self.BlurEffect.Size = 0
+    self.BlurEffect.Parent = game:GetService("Lighting")
+end
 
-    -- Создаем кнопку вкладки
-    local tabButton = createButton(self.TabPanel, name, UDim2.new(1, -2, 0, 30), UDim2.new(0, 1, 0, 30 * (#self.Tabs)), function()
-        self:ShowTab(tab)
+-- Create main UI container
+function NexusUI:CreateMainUI()
+    -- Remove old UI if exists
+    pcall(function()
+        local oldUI = CoreGui:FindFirstChild("NexusUIModern")
+        if oldUI then
+            oldUI:Destroy()
+        end
     end)
-    tabButton.Text = name
+    
+    -- Main ScreenGui
+    self.ScreenGui = Instance.new("ScreenGui")
+    self.ScreenGui.Name = "NexusUIModern"
+    self.ScreenGui.Parent = CoreGui
+    self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    self.ScreenGui.ResetOnSpawn = false
+    self.ScreenGui.Enabled = false
+    
+    -- Main Window
+    self.MainWindow = Instance.new("Frame")
+    self.MainWindow.Name = "MainWindow"
+    self.MainWindow.Size = self.Config.WindowSize
+    self.MainWindow.Position = UDim2.new(0.5, -self.Config.WindowSize.X.Offset/2, 0.5, -self.Config.WindowSize.Y.Offset/2)
+    self.MainWindow.BackgroundColor3 = self.Colors.Background
+    self.MainWindow.BackgroundTransparency = 1
+    self.MainWindow.Visible = false
+    self.MainWindow.Parent = self.ScreenGui
+    
+    local WindowCorner = Instance.new("UICorner")
+    WindowCorner.CornerRadius = self.Config.CornerRadius
+    WindowCorner.Parent = self.MainWindow
+    
+    local WindowStroke = Instance.new("UIStroke")
+    WindowStroke.Color = self.Colors.SurfaceLight
+    WindowStroke.Thickness = 1
+    WindowStroke.Parent = self.MainWindow
+    
+    -- Top Bar
+    self.TopBar = Instance.new("Frame")
+    self.TopBar.Name = "TopBar"
+    self.TopBar.Size = UDim2.new(1, 0, 0, 40)
+    self.TopBar.BackgroundColor3 = self.Colors.Surface
+    self.TopBar.Parent = self.MainWindow
+    
+    local TopBarCorner = Instance.new("UICorner")
+    TopBarCorner.CornerRadius = UDim.new(0, 10)
+    TopBarCorner.Parent = self.TopBar
+    
+    self.TitleLabel = Instance.new("TextLabel")
+    self.TitleLabel.Name = "TitleLabel"
+    self.TitleLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    self.TitleLabel.Position = UDim2.new(0, 15, 0, 0)
+    self.TitleLabel.BackgroundTransparency = 1
+    self.TitleLabel.Text = "NEXUS UI"
+    self.TitleLabel.TextColor3 = self.Colors.TextPrimary
+    self.TitleLabel.TextSize = 16
+    self.TitleLabel.Font = Enum.Font.GothamBold
+    self.TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    self.TitleLabel.Parent = self.TopBar
+    
+    self.CloseButton = Instance.new("ImageButton")
+    self.CloseButton.Name = "CloseButton"
+    self.CloseButton.Size = UDim2.new(0, 25, 0, 25)
+    self.CloseButton.Position = UDim2.new(1, -35, 0.5, -12.5)
+    self.CloseButton.BackgroundColor3 = self.Colors.Error
+    self.CloseButton.Parent = self.TopBar
+    
+    local CloseCorner = Instance.new("UICorner")
+    CloseCorner.CornerRadius = UDim.new(1, 0)
+    CloseCorner.Parent = self.CloseButton
+    
+    local CloseIcon = Instance.new("ImageLabel")
+    CloseIcon.Name = "CloseIcon"
+    CloseIcon.Size = UDim2.new(0.5, 0, 0.5, 0)
+    CloseIcon.Position = UDim2.new(0.25, 0, 0.25, 0)
+    CloseIcon.BackgroundTransparency = 1
+    CloseIcon.Image = "rbxassetid://3926305904"
+    CloseIcon.ImageRectOffset = Vector2.new(284, 4)
+    CloseIcon.ImageRectSize = Vector2.new(24, 24)
+    CloseIcon.ImageColor3 = self.Colors.TextPrimary
+    CloseIcon.Parent = self.CloseButton
+    
+    -- Main Content Area
+    self.MainContent = Instance.new("Frame")
+    self.MainContent.Name = "MainContent"
+    self.MainContent.Size = UDim2.new(1, 0, 1, -40)
+    self.MainContent.Position = UDim2.new(0, 0, 0, 40)
+    self.MainContent.BackgroundTransparency = 1
+    self.MainContent.Parent = self.MainWindow
+    
+    -- Sidebar Navigation
+    self.Sidebar = Instance.new("Frame")
+    self.Sidebar.Name = "Sidebar"
+    self.Sidebar.Size = UDim2.new(0, 200, 1, 0)
+    self.Sidebar.BackgroundColor3 = self.Colors.Surface
+    self.Sidebar.Parent = self.MainContent
+    
+    local SidebarCorner = Instance.new("UICorner")
+    SidebarCorner.CornerRadius = UDim.new(0, 10)
+    SidebarCorner.Parent = self.Sidebar
+    
+    -- Navigation List
+    self.NavigationList = Instance.new("ScrollingFrame")
+    self.NavigationList.Name = "NavigationList"
+    self.NavigationList.Size = UDim2.new(1, -20, 1, -100)
+    self.NavigationList.Position = UDim2.new(0, 10, 0, 10)
+    self.NavigationList.BackgroundTransparency = 1
+    self.NavigationList.ScrollBarThickness = 4
+    self.NavigationList.ScrollBarImageColor3 = self.Colors.SurfaceLight
+    self.NavigationList.CanvasSize = UDim2.new(0, 0, 0, 0)
+    self.NavigationList.Parent = self.Sidebar
+    
+    self.NavigationLayout = Instance.new("UIListLayout")
+    self.NavigationLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    self.NavigationLayout.Padding = UDim.new(0, 6)
+    self.NavigationLayout.Parent = self.NavigationList
+    
+    -- Profile Section
+    self.ProfileSection = Instance.new("Frame")
+    self.ProfileSection.Name = "ProfileSection"
+    self.ProfileSection.Size = UDim2.new(1, -20, 0, 80)
+    self.ProfileSection.Position = UDim2.new(0, 10, 1, -90)
+    self.ProfileSection.BackgroundColor3 = self.Colors.SurfaceLight
+    self.ProfileSection.Parent = self.Sidebar
+    
+    local ProfileCorner = Instance.new("UICorner")
+    ProfileCorner.CornerRadius = self.Config.CornerRadius
+    ProfileCorner.Parent = self.ProfileSection
+    
+    local AvatarFrame = Instance.new("Frame")
+    AvatarFrame.Name = "AvatarFrame"
+    AvatarFrame.Size = UDim2.new(0, 50, 0, 50)
+    AvatarFrame.Position = UDim2.new(0, 10, 0.5, -25)
+    AvatarFrame.BackgroundColor3 = self.Colors.Surface
+    AvatarFrame.Parent = self.ProfileSection
+    
+    local AvatarCorner = Instance.new("UICorner")
+    AvatarCorner.CornerRadius = UDim.new(1, 0)
+    AvatarCorner.Parent = AvatarFrame
+    
+    local AvatarStroke = Instance.new("UIStroke")
+    AvatarStroke.Color = self.Colors.Primary
+    AvatarStroke.Thickness = 2
+    AvatarStroke.Parent = AvatarFrame
+    
+    self.AvatarImage = Instance.new("ImageLabel")
+    self.AvatarImage.Name = "AvatarImage"
+    self.AvatarImage.Size = UDim2.new(0.8, 0, 0.8, 0)
+    self.AvatarImage.Position = UDim2.new(0.1, 0, 0.1, 0)
+    self.AvatarImage.BackgroundTransparency = 1
+    self.AvatarImage.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+    self.AvatarImage.Parent = AvatarFrame
+    
+    self.UsernameLabel = Instance.new("TextLabel")
+    self.UsernameLabel.Name = "UsernameLabel"
+    self.UsernameLabel.Size = UDim2.new(1, -70, 0, 20)
+    self.UsernameLabel.Position = UDim2.new(0, 65, 0, 20)
+    self.UsernameLabel.BackgroundTransparency = 1
+    self.UsernameLabel.Text = Players.LocalPlayer.Name or "Player"
+    self.UsernameLabel.TextColor3 = self.Colors.TextPrimary
+    self.UsernameLabel.TextSize = 14
+    self.UsernameLabel.Font = Enum.Font.GothamBold
+    self.UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    self.UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    self.UsernameLabel.Parent = self.ProfileSection
+    
+    self.WelcomeLabel = Instance.new("TextLabel")
+    self.WelcomeLabel.Name = "WelcomeLabel"
+    self.WelcomeLabel.Size = UDim2.new(1, -70, 0, 16)
+    self.WelcomeLabel.Position = UDim2.new(0, 65, 0, 42)
+    self.WelcomeLabel.BackgroundTransparency = 1
+    self.WelcomeLabel.Text = "Добро пожаловать!"
+    self.WelcomeLabel.TextColor3 = self.Colors.TextSecondary
+    self.WelcomeLabel.TextSize = 12
+    self.WelcomeLabel.Font = Enum.Font.Gotham
+    self.WelcomeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    self.WelcomeLabel.Parent = self.ProfileSection
+    
+    -- Content Pages
+    self.ContentPages = Instance.new("Frame")
+    self.ContentPages.Name = "ContentPages"
+    self.ContentPages.Size = UDim2.new(1, -200, 1, 0)
+    self.ContentPages.Position = UDim2.new(0, 200, 0, 0)
+    self.ContentPages.BackgroundTransparency = 1
+    self.ContentPages.Parent = self.MainContent
+    
+    -- Dragging variables
+    self.dragging = false
+    self.dragInput = nil
+    self.dragStart = nil
+    self.startPos = nil
+end
 
-    table.insert(self.Tabs, tab)
+-- Create key system UI
+function NexusUI:CreateKeySystem()
+    self.KeySystemUI = Instance.new("Frame")
+    self.KeySystemUI.Name = "KeySystem"
+    self.KeySystemUI.Size = UDim2.new(0, 400, 0, 300)
+    self.KeySystemUI.Position = UDim2.new(0.5, -200, 0.5, -150)
+    self.KeySystemUI.BackgroundColor3 = self.Colors.Background
+    self.KeySystemUI.BackgroundTransparency = 1
+    self.KeySystemUI.Visible = false
+    self.KeySystemUI.Parent = self.ScreenGui
+    
+    local KeySystemCorner = Instance.new("UICorner")
+    KeySystemCorner.CornerRadius = self.Config.CornerRadius
+    KeySystemCorner.Parent = self.KeySystemUI
+    
+    local KeySystemStroke = Instance.new("UIStroke")
+    KeySystemStroke.Color = self.Colors.SurfaceLight
+    KeySystemStroke.Thickness = 1
+    KeySystemStroke.Parent = self.KeySystemUI
+    
+    local KeyTitle = Instance.new("TextLabel")
+    KeyTitle.Name = "KeyTitle"
+    KeyTitle.Size = UDim2.new(1, 0, 0, 60)
+    KeyTitle.Position = UDim2.new(0, 0, 0, 0)
+    KeyTitle.BackgroundColor3 = self.Colors.Surface
+    KeyTitle.Text = "NEXUS KEY SYSTEM"
+    KeyTitle.TextColor3 = self.Colors.TextPrimary
+    KeyTitle.TextSize = 20
+    KeyTitle.Font = Enum.Font.GothamBold
+    KeyTitle.Parent = self.KeySystemUI
+    
+    local KeyTitleCorner = Instance.new("UICorner")
+    KeyTitleCorner.CornerRadius = UDim.new(0, 10)
+    KeyTitleCorner.Parent = KeyTitle
+    
+    self.KeyInput = Instance.new("TextBox")
+    self.KeyInput.Name = "KeyInput"
+    self.KeyInput.Size = UDim2.new(1, -40, 0, 40)
+    self.KeyInput.Position = UDim2.new(0, 20, 0, 80)
+    self.KeyInput.BackgroundColor3 = self.Colors.SurfaceLight
+    self.KeyInput.TextColor3 = self.Colors.TextPrimary
+    self.KeyInput.Text = ""
+    self.KeyInput.PlaceholderText = "Введите ключ доступа..."
+    self.KeyInput.TextSize = 14
+    self.KeyInput.Font = Enum.Font.Gotham
+    self.KeyInput.Parent = self.KeySystemUI
+    
+    local KeyInputCorner = Instance.new("UICorner")
+    KeyInputCorner.CornerRadius = self.Config.CornerRadius
+    KeyInputCorner.Parent = self.KeyInput
+    
+    self.KeySubmit = Instance.new("TextButton")
+    self.KeySubmit.Name = "KeySubmit"
+    self.KeySubmit.Size = UDim2.new(1, -40, 0, 40)
+    self.KeySubmit.Position = UDim2.new(0, 20, 0, 140)
+    self.KeySubmit.BackgroundColor3 = self.Colors.Primary
+    self.KeySubmit.TextColor3 = self.Colors.TextPrimary
+    self.KeySubmit.Text = "АКТИВИРОВАТЬ"
+    self.KeySubmit.TextSize = 16
+    self.KeySubmit.Font = Enum.Font.GothamBold
+    self.KeySubmit.Parent = self.KeySystemUI
+    
+    local KeySubmitCorner = Instance.new("UICorner")
+    KeySubmitCorner.CornerRadius = self.Config.CornerRadius
+    KeySubmitCorner.Parent = self.KeySubmit
+    
+    self.KeyMessage = Instance.new("TextLabel")
+    self.KeyMessage.Name = "KeyMessage"
+    self.KeyMessage.Size = UDim2.new(1, -40, 0, 40)
+    self.KeyMessage.Position = UDim2.new(0, 20, 0, 200)
+    self.KeyMessage.BackgroundTransparency = 1
+    self.KeyMessage.Text = "Доступные ключи будут показаны в консоли (F9)"
+    self.KeyMessage.TextColor3 = self.Colors.TextSecondary
+    self.KeyMessage.TextSize = 12
+    self.KeyMessage.Font = Enum.Font.Gotham
+    self.KeyMessage.TextWrapped = true
+    self.KeyMessage.Parent = self.KeySystemUI
+end
 
-    -- Создаем контейнер для секций
-    local sectionContainer = createFrame(self.ContentPanel, "SectionContainer_" .. name, UDim2.new(1, 0, 1, 0), UDim2.new(0, 0, 0, 0), Color3.fromRGB(20, 20, 20), 0, 5)
-    sectionContainer.Visible = false
+-- Setup event handlers
+function NexusUI:SetupEventHandlers()
+    -- Key system events
+    self.KeySubmit.MouseButton1Click:Connect(function()
+        self:OnKeySubmit()
+    end)
+    
+    -- Dragging events
+    self.TopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            self.dragging = true
+            self.dragStart = input.Position
+            self.startPos = self.MainWindow.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    self.dragging = false
+                end
+            end)
+        end
+    end)
+    
+    self.TopBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            self.dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == self.dragInput and self.dragging then
+            self:UpdateInput(input)
+        end
+    end)
+    
+    -- Close button
+    self.CloseButton.MouseButton1Click:Connect(function()
+        self:HideMainUI()
+    end)
+    
+    -- Toggle UI with key
+    self.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == self.Config.ToggleKey then
+            if not self.Enabled then
+                if self.KeySystem.Enabled and not self.KeySystem.CurrentKey then
+                    self:ShowKeySystem()
+                else
+                    self:ShowMainUI()
+                end
+            else
+                self:HideMainUI()
+            end
+        end
+    end)
+    
+    -- Auto cleanup
+    Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            self:Destroy()
+        end
+    end)
+end
 
-    tab.SectionContainer = sectionContainer
+-- Update input for dragging
+function NexusUI:UpdateInput(input)
+    if not self.MainWindow or not self.MainWindow.Parent then return end
+    local delta = input.Position - self.dragStart
+    self.MainWindow.Position = UDim2.new(
+        self.startPos.X.Scale, 
+        self.startPos.X.Offset + delta.X, 
+        self.startPos.Y.Scale, 
+        self.startPos.Y.Offset + delta.Y
+    )
+end
 
-    if #self.Tabs == 1 then
-        self:ShowTab(tab)
+-- Key system functions
+function NexusUI:ValidateKey(key)
+    key = string.upper(key)
+    for _, validKey in ipairs(self.KeySystem.ValidKeys) do
+        if key == validKey then
+            return true
+        end
     end
+    return false
+end
 
+function NexusUI:OnKeySubmit()
+    local key = string.upper(self.KeyInput.Text)
+    
+    if self:ValidateKey(key) then
+        self.KeySystem.CurrentKey = key
+        self.KeyMessage.Text = "✅ Ключ принят! Загрузка..."
+        self.KeyMessage.TextColor3 = self.Colors.Success
+        
+        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Success}):Play()
+        
+        wait(1)
+        self:HideKeySystem()
+        self:ShowMainUI()
+    else
+        self.KeyMessage.Text = "❌ Неверный ключ! Попробуйте снова."
+        self.KeyMessage.TextColor3 = self.Colors.Error
+        
+        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Error}):Play()
+        wait(1)
+        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Primary}):Play()
+    end
+end
+
+function NexusUI:ShowKeySystem()
+    self.ScreenGui.Enabled = true
+    self.KeySystemUI.Visible = true
+    self.KeySystemUI.BackgroundTransparency = 1
+    
+    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.5), {BackgroundTransparency = 0}):Play()
+    TweenService:Create(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount}):Play()
+    
+    -- Show available keys in console
+    print("=== NEXUS KEY SYSTEM ===")
+    print("Доступные ключи:")
+    for i, key in ipairs(self.KeySystem.ValidKeys) do
+        print(key)
+    end
+    print("========================")
+end
+
+function NexusUI:HideKeySystem()
+    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+    wait(0.3)
+    self.KeySystemUI.Visible = false
+end
+
+-- UI visibility management
+function NexusUI:ShowMainUI()
+    if not self.ScreenGui or not self.ScreenGui.Parent then return end
+    
+    -- Load player avatar
+    pcall(function()
+        local userId = Players.LocalPlayer.UserId
+        self.AvatarImage.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
+    end)
+    
+    self.ScreenGui.Enabled = true
+    self.MainWindow.Visible = true
+    
+    -- Blur background
+    self:SafeTween(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount})
+    
+    -- Animate window appearance
+    self.MainWindow.BackgroundTransparency = 1
+    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        BackgroundTransparency = 0,
+        Size = self.Config.WindowSize
+    })
+    
+    -- Select first tab if available
+    if self.CurrentTab and self.Tabs[self.CurrentTab] then
+        self:SelectTab(self.CurrentTab)
+    elseif next(self.Tabs) then
+        for tabName, _ in pairs(self.Tabs) do
+            self:SelectTab(tabName)
+            break
+        end
+    end
+    
+    self.Enabled = true
+end
+
+function NexusUI:HideMainUI()
+    if not self.ScreenGui then return end
+    
+    -- Animate window disappearance
+    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0, 0, 0, 0)
+    })
+    
+    -- Remove blur
+    self:SafeTween(self.BlurEffect, TweenInfo.new(0.3), {Size = 0})
+    
+    wait(self.Config.AnimationDuration)
+    self.MainWindow.Visible = false
+    self.ScreenGui.Enabled = false
+    self.Enabled = false
+end
+
+-- Safe tween function
+function NexusUI:SafeTween(object, tweenInfo, properties)
+    if object and object.Parent then
+        local tween = TweenService:Create(object, tweenInfo, properties)
+        tween:Play()
+        return tween
+    end
+    return nil
+end
+
+-- Tab management
+function NexusUI:CreateTab(tabConfig)
+    local tabName = tabConfig.Name
+    if not tabName then
+        warn("NexusUI: Tab name is required")
+        return nil
+    end
+    
+    -- Create navigation button
+    local navButton = self:CreateNavButton(tabConfig)
+    local contentPage = self:CreateContentPage(tabConfig)
+    
+    if not navButton or not contentPage then
+        warn("NexusUI: Failed to create tab elements for " .. tabName)
+        return nil
+    end
+    
+    -- Store tab data
+    self.Tabs[tabName] = {
+        Button = navButton,
+        Page = contentPage,
+        Elements = {}
+    }
+    
+    -- Set click handler
+    navButton.MouseButton1Click:Connect(function()
+        self:SelectTab(tabName)
+    end)
+    
+    -- Select first tab automatically
+    if not self.CurrentTab then
+        self.CurrentTab = tabName
+    end
+    
+    -- Update navigation list size
+    self.NavigationLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if self.NavigationList then
+            self.NavigationList.CanvasSize = UDim2.new(0, 0, 0, self.NavigationLayout.AbsoluteContentSize.Y)
+        end
+    end)
+    
     return {
-        CreateSection = function(sectionName)
-            if #tab.Sections >= 4 then
-                warn("Maximum 4 sections per tab!")
-                return nil
-            end
-
-            -- Убедимся, что sectionName — строка
-            if type(sectionName) ~= "string" then
-                sectionName = tostring(sectionName) or "Unnamed Section"
-            end
-
-            local section = {
-                Name = sectionName,
-                Elements = {},
-                Index = #tab.Sections + 1,
-            }
-
-            local sectionFrame = createFrame(sectionContainer, "Section_" .. sectionName, UDim2.new(1, -10, 0, 80), UDim2.new(0, 5, 0, 5 + 85 * (#tab.Sections)), COLORS.SectionBackground, 1, 5)
-
-            local sectionTitle = createTextLabel(sectionFrame, "SectionTitle", sectionName, UDim2.new(1, -10, 0, 20), UDim2.new(0, 5, 0, 0), COLORS.Text, 14, FONT)
-            sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-            -- Размещаем элементы внутри секции
-            local elementY = 25
-            local elementSpacing = 5
-
-            section.AddElement = function(elementFrame)
-                elementFrame.Position = UDim2.new(0, 5, 0, elementY)
-                elementY = elementY + elementFrame.Size.Y.Offset + elementSpacing
-                sectionFrame.Size = UDim2.new(1, -10, 0, elementY - elementSpacing + 5)
-            end
-
-            section.CreateButton = function(data)
-                local btn = createButton(sectionFrame, data.Name, UDim2.new(1, -10, 0, 25), UDim2.new(0, 5, 0, elementY), data.Callback)
-                section.AddElement(btn)
-                table.insert(section.Elements, { Type = "Button", Object = btn })
-                return btn
-            end
-
-            section.CreateToggle = function(data)
-                local tog = createToggle(sectionFrame, data.Name, data.CurrentValue, data.Flag, data.Callback)
-                section.AddElement(tog)
-                table.insert(section.Elements, { Type = "Toggle", Object = tog })
-                return tog
-            end
-
-            section.CreateSlider = function(data)
-                local sld = createSlider(sectionFrame, data.Name, data.Min, data.Max, data.Default, data.Flag, data.Callback)
-                section.AddElement(sld)
-                table.insert(section.Elements, { Type = "Slider", Object = sld })
-                return sld
-            end
-
-            section.CreateInputValue = function(data)
-                local inp = createInputValue(sectionFrame, data.Name, data.DefaultValue, data.Flag, data.Callback)
-                section.AddElement(inp)
-                table.insert(section.Elements, { Type = "InputValue", Object = inp })
-                return inp
-            end
-
-            section.CreateKeyBind = function(data)
-                local kb = createKeyBind(sectionFrame, data.Name, data.Default, data.Flag, data.Callback)
-                section.AddElement(kb)
-                table.insert(section.Elements, { Type = "KeyBind", Object = kb })
-                return kb
-            end
-
-            section.CreateText = function(data)
-                local txt = createText(sectionFrame, data.Text)
-                section.AddElement(txt)
-                table.insert(section.Elements, { Type = "Text", Object = txt })
-                return txt
-            end
-
-            table.insert(tab.Sections, section)
-
-            return section
+        AddButton = function(buttonConfig)
+            return self:AddButtonToTab(tabName, buttonConfig)
+        end,
+        AddToggle = function(toggleConfig)
+            return self:AddToggleToTab(tabName, toggleConfig)
+        end,
+        AddSection = function(sectionConfig)
+            return self:AddSectionToTab(tabName, sectionConfig)
+        end,
+        AddColorPicker = function(colorConfig)
+            return self:AddColorPickerToTab(tabName, colorConfig)
+        end,
+        AddDropdown = function(dropdownConfig)
+            return self:AddDropdownToTab(tabName, dropdownConfig)
+        end,
+        AddLabel = function(labelConfig)
+            return self:AddLabelToTab(tabName, labelConfig)
         end
     }
 end
 
-function Window:ShowTab(tab)
-    for _, t in ipairs(self.Tabs) do
-        t.SectionContainer.Visible = false
+function NexusUI:SelectTab(tabName)
+    if not self.Tabs[tabName] then return end
+    
+    -- Deselect all buttons
+    for name, tabData in pairs(self.Tabs) do
+        if tabData.Button and tabData.Button.Parent then
+            tabData.Button:SetAttribute("Selected", false)
+            self:SafeTween(tabData.Button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
+            if tabData.Button:FindFirstChild("Highlight") then
+                self:SafeTween(tabData.Button.Highlight, TweenInfo.new(0.2), {BackgroundTransparency = 1})
+            end
+            if tabData.Button:FindFirstChild("Label") then
+                self:SafeTween(tabData.Button.Label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextSecondary})
+            end
+            if tabData.Button:FindFirstChild("Icon") then
+                self:SafeTween(tabData.Button.Icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextSecondary})
+            end
+        end
     end
-    tab.SectionContainer.Visible = true
+    
+    -- Hide all pages
+    for name, tabData in pairs(self.Tabs) do
+        if tabData.Page and tabData.Page.Parent then
+            tabData.Page.Visible = false
+        end
+    end
+    
+    -- Select current button and show page
+    local currentTab = self.Tabs[tabName]
+    currentTab.Button:SetAttribute("Selected", true)
+    self:SafeTween(currentTab.Button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.Primary})
+    if currentTab.Button:FindFirstChild("Highlight") then
+        self:SafeTween(currentTab.Button.Highlight, TweenInfo.new(0.2), {BackgroundTransparency = 0})
+    end
+    if currentTab.Button:FindFirstChild("Label") then
+        self:SafeTween(currentTab.Button.Label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextPrimary})
+    end
+    if currentTab.Button:FindFirstChild("Icon") then
+        self:SafeTween(currentTab.Button.Icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextPrimary})
+    end
+    
+    currentTab.Page.Visible = true
+    self.CurrentTab = tabName
 end
 
--- Функция создания окна
-function MenuAPI.CreateWindow(config)
-    local window = Window.new(config.Name, config.Beta, config.Game, config.ToggleKey)
-    return window
+-- UI element creation functions
+function NexusUI:CreateNavButton(navConfig)
+    if not navConfig or not navConfig.Name or not self.NavigationList then
+        return nil
+    end
+    
+    local button = Instance.new("TextButton")
+    button.Name = navConfig.Name .. "Nav"
+    button.Size = UDim2.new(1, 0, 0, 40)
+    button.BackgroundColor3 = self.Colors.SurfaceLight
+    button.Text = ""
+    button.Parent = self.NavigationList
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Config.CornerRadius
+    corner.Parent = button
+    
+    local icon = Instance.new("ImageLabel")
+    icon.Name = "Icon"
+    icon.Size = UDim2.new(0, 20, 0, 20)
+    icon.Position = UDim2.new(0, 12, 0.5, -10)
+    icon.BackgroundTransparency = 1
+    icon.Image = navConfig.Icon or "rbxassetid://3926305904"
+    icon.ImageColor3 = self.Colors.TextSecondary
+    icon.Parent = button
+    
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.Size = UDim2.new(1, -45, 1, 0)
+    label.Position = UDim2.new(0, 40, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = navConfig.Name
+    label.TextColor3 = self.Colors.TextSecondary
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = button
+    
+    local highlight = Instance.new("Frame")
+    highlight.Name = "Highlight"
+    highlight.Size = UDim2.new(0, 3, 0.6, 0)
+    highlight.Position = UDim2.new(0, 0, 0.2, 0)
+    highlight.BackgroundColor3 = self.Colors.Primary
+    highlight.BackgroundTransparency = 1
+    highlight.Parent = button
+    
+    local highlightCorner = Instance.new("UICorner")
+    highlightCorner.CornerRadius = UDim.new(1, 0)
+    highlightCorner.Parent = highlight
+    
+    -- Hover effects
+    button.MouseEnter:Connect(function()
+        if not button:GetAttribute("Selected") then
+            self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
+            self:SafeTween(label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextPrimary})
+            self:SafeTween(icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextPrimary})
+        end
+    end)
+    
+    button.MouseLeave:Connect(function()
+        if not button:GetAttribute("Selected") then
+            self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
+            self:SafeTween(label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextSecondary})
+            self:SafeTween(icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextSecondary})
+        end
+    end)
+    
+    return button
 end
 
-return MenuAPI
+function NexusUI:CreateContentPage(pageConfig)
+    if not pageConfig or not pageConfig.Name or not self.ContentPages then
+        return nil
+    end
+    
+    local page = Instance.new("ScrollingFrame")
+    page.Name = pageConfig.Name .. "Page"
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.ScrollBarThickness = 4
+    page.ScrollBarImageColor3 = self.Colors.SurfaceLight
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.Visible = false
+    page.Parent = self.ContentPages
+    
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 10)
+    layout.Parent = page
+    
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, 15)
+    padding.PaddingLeft = UDim.new(0, 15)
+    padding.PaddingRight = UDim.new(0, 15)
+    padding.PaddingBottom = UDim.new(0, 15)
+    padding.Parent = page
+    
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if page and page.Parent then
+            page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
+        end
+    end)
+    
+    return page
+end
+
+function NexusUI:AddSectionToTab(tabName, sectionConfig)
+    if not self.Tabs[tabName] then return nil end
+    
+    local tab = self.Tabs[tabName]
+    local section = self:CreateRoundedFrame(tab.Page, UDim2.new(1, 0, 0, 50), nil, self.Colors.Surface)
+    section.BackgroundTransparency = 0
+    
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, -20, 0, 25)
+    title.Position = UDim2.new(0, 15, 0, 12)
+    title.BackgroundTransparency = 1
+    title.Text = sectionConfig.Name
+    title.TextColor3 = self.Colors.TextPrimary
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = section
+    
+    local content = Instance.new("Frame")
+    content.Name = "Content"
+    content.Size = UDim2.new(1, -20, 0, 0)
+    content.Position = UDim2.new(0, 15, 0, 40)
+    content.BackgroundTransparency = 1
+    content.Parent = section
+    
+    local contentLayout = Instance.new("UIListLayout")
+    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    contentLayout.Padding = UDim.new(0, 8)
+    contentLayout.Parent = content
+    
+    contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
+        section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
+    end)
+    
+    -- Store section in tab elements
+    table.insert(tab.Elements, {
+        Type = "Section",
+        Object = section,
+        Content = content
+    })
+    
+    return {
+        AddButton = function(buttonConfig)
+            return self:AddButtonToSection(content, buttonConfig)
+        end,
+        AddToggle = function(toggleConfig)
+            return self:AddToggleToSection(content, toggleConfig)
+        end,
+        AddColorPicker = function(colorConfig)
+            return self:AddColorPickerToSection(content, colorConfig)
+        end,
+        AddDropdown = function(dropdownConfig)
+            return self:AddDropdownToSection(content, dropdownConfig)
+        end,
+        AddLabel = function(labelConfig)
+            return self:AddLabelToSection(content, labelConfig)
+        end
+    }
+end
+
+function NexusUI:AddButtonToTab(tabName, buttonConfig)
+    if not self.Tabs[tabName] then return nil end
+    
+    local tab = self.Tabs[tabName]
+    local button = self:CreateButton(tab.Page, buttonConfig)
+    
+    table.insert(tab.Elements, {
+        Type = "Button",
+        Object = button
+    })
+    
+    return button
+end
+
+function NexusUI:AddButtonToSection(sectionContent, buttonConfig)
+    local button = self:CreateButton(sectionContent, buttonConfig)
+    return button
+end
+
+function NexusUI:CreateButton(parent, buttonConfig)
+    if not buttonConfig or not buttonConfig.Name then
+        return nil
+    end
+    
+    local button = Instance.new("TextButton")
+    button.Name = buttonConfig.Name .. "Button"
+    button.Size = UDim2.new(1, 0, 0, 35)
+    button.BackgroundColor3 = self.Colors.Primary
+    button.Text = buttonConfig.Name
+    button.TextColor3 = self.Colors.TextPrimary
+    button.TextSize = 13
+    button.Font = Enum.Font.Gotham
+    button.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Config.CornerRadius
+    corner.Parent = button
+    
+    -- Hover effects
+    button.MouseEnter:Connect(function()
+        self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.PrimaryDark})
+    end)
+    
+    button.MouseLeave:Connect(function()
+        self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.Primary})
+    end)
+    
+    if buttonConfig.Callback then
+        button.MouseButton1Click:Connect(function()
+            pcall(buttonConfig.Callback)
+        end
+    end
+    
+    return button
+end
+
+function NexusUI:AddToggleToTab(tabName, toggleConfig)
+    if not self.Tabs[tabName] then return nil end
+    
+    local tab = self.Tabs[tabName]
+    local toggle = self:CreateToggle(tab.Page, toggleConfig)
+    
+    table.insert(tab.Elements, {
+        Type = "Toggle",
+        Object = toggle
+    })
+    
+    return toggle
+end
+
+function NexusUI:AddToggleToSection(sectionContent, toggleConfig)
+    local toggle = self:CreateToggle(sectionContent, toggleConfig)
+    return toggle
+end
+
+function NexusUI:CreateToggle(parent, toggleConfig)
+    if not toggleConfig or not toggleConfig.Name then
+        return nil
+    end
+    
+    local toggle = Instance.new("Frame")
+    toggle.Name = toggleConfig.Name .. "Toggle"
+    toggle.Size = UDim2.new(1, 0, 0, 32)
+    toggle.BackgroundTransparency = 1
+    toggle.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = toggleConfig.Name
+    label.TextColor3 = self.Colors.TextPrimary
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = toggle
+    
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Name = "ToggleButton"
+    toggleButton.Size = UDim2.new(0, 45, 0, 22)
+    toggleButton.Position = UDim2.new(1, -45, 0.5, -11)
+    toggleButton.BackgroundColor3 = self.Colors.SurfaceLight
+    toggleButton.Text = ""
+    toggleButton.Parent = toggle
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggleButton
+    
+    local toggleKnob = Instance.new("Frame")
+    toggleKnob.Name = "ToggleKnob"
+    toggleKnob.Size = UDim2.new(0, 18, 0, 18)
+    toggleKnob.Position = UDim2.new(0, 2, 0.5, -9)
+    toggleKnob.BackgroundColor3 = self.Colors.TextPrimary
+    toggleKnob.Parent = toggleButton
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = toggleKnob
+    
+    local currentValue = toggleConfig.CurrentValue or false
+    
+    local function updateToggle()
+        if currentValue then
+            self:SafeTween(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.Primary})
+            self:SafeTween(toggleKnob, TweenInfo.new(0.2), {Position = UDim2.new(1, -20, 0.5, -9)})
+        else
+            self:SafeTween(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
+            self:SafeTween(toggleKnob, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -9)})
+        end
+    end
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        currentValue = not currentValue
+        updateToggle()
+        if toggleConfig.Callback then
+            pcall(toggleConfig.Callback, currentValue)
+        end
+    end)
+    
+    updateToggle()
+    
+    local toggleObject = {}
+    function toggleObject:Set(value)
+        currentValue = value
+        updateToggle()
+    end
+    
+    function toggleObject:Get()
+        return currentValue
+    end
+    
+    return toggleObject
+end
+
+function NexusUI:AddLabelToTab(tabName, labelConfig)
+    if not self.Tabs[tabName] then return nil end
+    
+    local tab = self.Tabs[tabName]
+    local label = self:CreateLabel(tab.Page, labelConfig)
+    
+    table.insert(tab.Elements, {
+        Type = "Label",
+        Object = label
+    })
+    
+    return label
+end
+
+function NexusUI:AddLabelToSection(sectionContent, labelConfig)
+    local label = self:CreateLabel(sectionContent, labelConfig)
+    return label
+end
+
+function NexusUI:CreateLabel(parent, labelConfig)
+    if not labelConfig or not labelConfig.Text then
+        return nil
+    end
+    
+    local label = Instance.new("TextLabel")
+    label.Name = "Label_" .. labelConfig.Text
+    label.Size = UDim2.new(1, 0, 0, labelConfig.Height or 20)
+    label.BackgroundTransparency = 1
+    label.Text = labelConfig.Text
+    label.TextColor3 = labelConfig.Color or self.Colors.TextPrimary
+    label.TextSize = labelConfig.TextSize or 13
+    label.Font = labelConfig.Font or Enum.Font.Gotham
+    label.TextXAlignment = labelConfig.Alignment or Enum.TextXAlignment.Left
+    label.TextWrapped = true
+    label.Parent = parent
+    
+    return label
+end
+
+-- Utility functions
+function NexusUI:CreateRoundedFrame(parent, size, position, backgroundColor)
+    if not parent then return nil end
+    local frame = Instance.new("Frame")
+    frame.Size = size or UDim2.new(1, 0, 1, 0)
+    frame.Position = position or UDim2.new(0, 0, 0, 0)
+    frame.BackgroundColor3 = backgroundColor or self.Colors.Surface
+    frame.Parent = parent
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = self.Config.CornerRadius
+    corner.Parent = frame
+    
+    return frame
+end
+
+-- Public API methods
+function NexusUI:SetTitle(title)
+    if self.TitleLabel then
+        self.TitleLabel.Text = title
+    end
+end
+
+function NexusUI:SetWindowSize(size)
+    if self.MainWindow then
+        self.Config.WindowSize = size
+        self.MainWindow.Size = size
+        self.MainWindow.Position = UDim2.new(0.5, -size.X.Offset/2, 0.5, -size.Y.Offset/2)
+    end
+end
+
+function NexusUI:Toggle()
+    if not self.Enabled then
+        self:ShowMainUI()
+    else
+        self:HideMainUI()
+    end
+end
+
+function NexusUI:Show()
+    self:ShowMainUI()
+end
+
+function NexusUI:Hide()
+    self:HideMainUI()
+end
+
+function NexusUI:Destroy()
+    if self.InputConnection then
+        self.InputConnection:Disconnect()
+    end
+    
+    if self.ScreenGui then
+        self.ScreenGui:Destroy()
+    end
+    
+    if self.BlurEffect then
+        self.BlurEffect:Destroy()
+    end
+    
+    -- Clean up tables
+    self.Elements = nil
+    self.Tabs = nil
+end
+
+-- Add placeholder methods for advanced components (can be extended)
+function NexusUI:AddColorPickerToTab(tabName, colorConfig)
+    -- Implementation for color picker
+    warn("NexusUI: ColorPicker not implemented in this version")
+    return nil
+end
+
+function NexusUI:AddColorPickerToSection(sectionContent, colorConfig)
+    -- Implementation for color picker
+    warn("NexusUI: ColorPicker not implemented in this version")
+    return nil
+end
+
+function NexusUI:AddDropdownToTab(tabName, dropdownConfig)
+    -- Implementation for dropdown
+    warn("NexusUI: Dropdown not implemented in this version")
+    return nil
+end
+
+function NexusUI:AddDropdownToSection(sectionContent, dropdownConfig)
+    -- Implementation for dropdown
+    warn("NexusUI: Dropdown not implemented in this version")
+    return nil
+end
+
+return NexusUI
