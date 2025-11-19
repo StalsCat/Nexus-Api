@@ -10,7 +10,6 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
 
 -- Default Configuration
 NexusUI.DefaultConfig = {
@@ -410,9 +409,14 @@ end
 
 -- Tab management
 function NexusUI:CreateTab(tabConfig)
+    if not tabConfig or type(tabConfig) ~= "table" then
+        warn("NexusUI: Invalid tab configuration")
+        return nil
+    end
+    
     local tabName = tabConfig.Name
-    if not tabName then
-        warn("NexusUI: Tab name is required")
+    if not tabName or type(tabName) ~= "string" then
+        warn("NexusUI: Tab name is required and must be a string")
         return nil
     end
     
@@ -451,36 +455,53 @@ function NexusUI:CreateTab(tabConfig)
         end)
     end
     
-    local tabObject = {
-        AddButton = function(buttonConfig)
-            return self:AddButtonToTab(tabName, buttonConfig)
-        end,
-        AddToggle = function(toggleConfig)
-            return self:AddToggleToTab(tabName, toggleConfig)
-        end,
-        AddSection = function(sectionConfig)
-            return self:AddSectionToTab(tabName, sectionConfig)
-        end,
-        AddColorPicker = function(colorConfig)
-            return self:AddColorPickerToTab(tabName, colorConfig)
-        end,
-        AddDropdown = function(dropdownConfig)
-            return self:AddDropdownToTab(tabName, dropdownConfig)
-        end,
-        AddLabel = function(labelConfig)
-            return self:AddLabelToTab(tabName, labelConfig)
-        end
-    }
+    -- Create tab API object
+    local tabAPI = {}
     
-    -- Защита от nil методов
-    setmetatable(tabObject, {
-        __index = function(_, key)
-            warn("NexusUI: Method '" .. key .. "' is not available for tab '" .. tabName .. "'")
-            return function() end
+    function tabAPI.AddButton(buttonConfig)
+        if not buttonConfig or type(buttonConfig) ~= "table" then
+            warn("NexusUI: Invalid button configuration")
+            return nil
         end
-    })
+        return self:AddButtonToTab(tabName, buttonConfig)
+    end
     
-    return tabObject
+    function tabAPI.AddToggle(toggleConfig)
+        if not toggleConfig or type(toggleConfig) ~= "table" then
+            warn("NexusUI: Invalid toggle configuration")
+            return nil
+        end
+        return self:AddToggleToTab(tabName, toggleConfig)
+    end
+    
+    function tabAPI.AddSection(sectionConfig)
+        if not sectionConfig or type(sectionConfig) ~= "table" then
+            warn("NexusUI: Invalid section configuration")
+            return nil
+        end
+        return self:AddSectionToTab(tabName, sectionConfig)
+    end
+    
+    function tabAPI.AddLabel(labelConfig)
+        if not labelConfig or type(labelConfig) ~= "table" then
+            warn("NexusUI: Invalid label configuration")
+            return nil
+        end
+        return self:AddLabelToTab(tabName, labelConfig)
+    end
+    
+    -- Placeholder methods for future features
+    function tabAPI.AddColorPicker(colorConfig)
+        warn("NexusUI: ColorPicker not implemented in this version")
+        return nil
+    end
+    
+    function tabAPI.AddDropdown(dropdownConfig)
+        warn("NexusUI: Dropdown not implemented in this version")
+        return nil
+    end
+    
+    return tabAPI
 end
 
 function NexusUI:SelectTab(tabName)
@@ -636,13 +657,17 @@ end
 
 function NexusUI:AddSectionToTab(tabName, sectionConfig)
     if not self.Tabs[tabName] then 
-        warn("NexusUI: Tab '" .. tabName .. "' does not exist")
+        warn("NexusUI: Tab '" .. tostring(tabName) .. "' does not exist")
         return nil
     end
     
-    -- Добавляем проверку на наличие Name в sectionConfig
-    if not sectionConfig or not sectionConfig.Name then
-        warn("NexusUI: Section name is required")
+    if not sectionConfig or type(sectionConfig) ~= "table" then
+        warn("NexusUI: Invalid section configuration")
+        return nil
+    end
+    
+    if not sectionConfig.Name or type(sectionConfig.Name) ~= "string" then
+        warn("NexusUI: Section name is required and must be a string")
         return nil
     end
     
@@ -655,7 +680,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     title.Size = UDim2.new(1, -20, 0, 25)
     title.Position = UDim2.new(0, 15, 0, 12)
     title.BackgroundTransparency = 1
-    title.Text = sectionConfig.Name or "Section" -- Защита от nil
+    title.Text = sectionConfig.Name
     title.TextColor3 = self.Colors.TextPrimary
     title.TextSize = 14
     title.Font = Enum.Font.GothamBold
@@ -688,33 +713,45 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Content = content
     })
     
-    local sectionObject = {
-        AddButton = function(buttonConfig)
-            return self:AddButtonToSection(content, buttonConfig)
-        end,
-        AddToggle = function(toggleConfig)
-            return self:AddToggleToSection(content, toggleConfig)
-        end,
-        AddColorPicker = function(colorConfig)
-            return self:AddColorPickerToSection(content, colorConfig)
-        end,
-        AddDropdown = function(dropdownConfig)
-            return self:AddDropdownToSection(content, dropdownConfig)
-        end,
-        AddLabel = function(labelConfig)
-            return self:AddLabelToSection(content, labelConfig)
-        end
-    }
+    -- Create section API object
+    local sectionAPI = {}
     
-    -- Защита от nil методов
-    setmetatable(sectionObject, {
-        __index = function(_, key)
-            warn("NexusUI: Method '" .. key .. "' is not available for section")
-            return function() end
+    function sectionAPI.AddButton(buttonConfig)
+        if not buttonConfig or type(buttonConfig) ~= "table" then
+            warn("NexusUI: Invalid button configuration")
+            return nil
         end
-    })
+        return self:AddButtonToSection(content, buttonConfig)
+    end
     
-    return sectionObject
+    function sectionAPI.AddToggle(toggleConfig)
+        if not toggleConfig or type(toggleConfig) ~= "table" then
+            warn("NexusUI: Invalid toggle configuration")
+            return nil
+        end
+        return self:AddToggleToSection(content, toggleConfig)
+    end
+    
+    function sectionAPI.AddLabel(labelConfig)
+        if not labelConfig or type(labelConfig) ~= "table" then
+            warn("NexusUI: Invalid label configuration")
+            return nil
+        end
+        return self:AddLabelToSection(content, labelConfig)
+    end
+    
+    -- Placeholder methods for future features
+    function sectionAPI.AddColorPicker(colorConfig)
+        warn("NexusUI: ColorPicker not implemented in this version")
+        return nil
+    end
+    
+    function sectionAPI.AddDropdown(dropdownConfig)
+        warn("NexusUI: Dropdown not implemented in this version")
+        return nil
+    end
+    
+    return sectionAPI
 end
 
 function NexusUI:AddButtonToTab(tabName, buttonConfig)
@@ -723,10 +760,12 @@ function NexusUI:AddButtonToTab(tabName, buttonConfig)
     local tab = self.Tabs[tabName]
     local button = self:CreateButton(tab.Page, buttonConfig)
     
-    table.insert(tab.Elements, {
-        Type = "Button",
-        Object = button
-    })
+    if button then
+        table.insert(tab.Elements, {
+            Type = "Button",
+            Object = button
+        })
+    end
     
     return button
 end
@@ -737,7 +776,13 @@ function NexusUI:AddButtonToSection(sectionContent, buttonConfig)
 end
 
 function NexusUI:CreateButton(parent, buttonConfig)
-    if not buttonConfig or not buttonConfig.Name then
+    if not buttonConfig or type(buttonConfig) ~= "table" then
+        warn("NexusUI: Invalid button configuration")
+        return nil
+    end
+    
+    if not buttonConfig.Name or type(buttonConfig.Name) ~= "string" then
+        warn("NexusUI: Button name is required and must be a string")
         return nil
     end
     
@@ -764,7 +809,7 @@ function NexusUI:CreateButton(parent, buttonConfig)
         self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.Primary})
     end)
     
-    if buttonConfig.Callback then
+    if buttonConfig.Callback and type(buttonConfig.Callback) == "function" then
         button.MouseButton1Click:Connect(function()
             pcall(buttonConfig.Callback)
         end)
@@ -779,10 +824,12 @@ function NexusUI:AddToggleToTab(tabName, toggleConfig)
     local tab = self.Tabs[tabName]
     local toggle = self:CreateToggle(tab.Page, toggleConfig)
     
-    table.insert(tab.Elements, {
-        Type = "Toggle",
-        Object = toggle
-    })
+    if toggle then
+        table.insert(tab.Elements, {
+            Type = "Toggle",
+            Object = toggle
+        })
+    end
     
     return toggle
 end
@@ -793,7 +840,13 @@ function NexusUI:AddToggleToSection(sectionContent, toggleConfig)
 end
 
 function NexusUI:CreateToggle(parent, toggleConfig)
-    if not toggleConfig or not toggleConfig.Name then
+    if not toggleConfig or type(toggleConfig) ~= "table" then
+        warn("NexusUI: Invalid toggle configuration")
+        return nil
+    end
+    
+    if not toggleConfig.Name or type(toggleConfig.Name) ~= "string" then
+        warn("NexusUI: Toggle name is required and must be a string")
         return nil
     end
     
@@ -852,7 +905,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
     toggleButton.MouseButton1Click:Connect(function()
         currentValue = not currentValue
         updateToggle()
-        if toggleConfig.Callback then
+        if toggleConfig.Callback and type(toggleConfig.Callback) == "function" then
             pcall(toggleConfig.Callback, currentValue)
         end
     end)
@@ -861,8 +914,10 @@ function NexusUI:CreateToggle(parent, toggleConfig)
     
     local toggleObject = {}
     function toggleObject:Set(value)
-        currentValue = value
-        updateToggle()
+        if type(value) == "boolean" then
+            currentValue = value
+            updateToggle()
+        end
     end
     
     function toggleObject:Get()
@@ -878,10 +933,12 @@ function NexusUI:AddLabelToTab(tabName, labelConfig)
     local tab = self.Tabs[tabName]
     local label = self:CreateLabel(tab.Page, labelConfig)
     
-    table.insert(tab.Elements, {
-        Type = "Label",
-        Object = label
-    })
+    if label then
+        table.insert(tab.Elements, {
+            Type = "Label",
+            Object = label
+        })
+    end
     
     return label
 end
@@ -892,7 +949,13 @@ function NexusUI:AddLabelToSection(sectionContent, labelConfig)
 end
 
 function NexusUI:CreateLabel(parent, labelConfig)
-    if not labelConfig or not labelConfig.Text then
+    if not labelConfig or type(labelConfig) ~= "table" then
+        warn("NexusUI: Invalid label configuration")
+        return nil
+    end
+    
+    if not labelConfig.Text or type(labelConfig.Text) ~= "string" then
+        warn("NexusUI: Label text is required and must be a string")
         return nil
     end
     
@@ -929,7 +992,7 @@ end
 
 -- Public API methods
 function NexusUI:SetTitle(title)
-    if self.TitleLabel then
+    if self.TitleLabel and type(title) == "string" then
         self.TitleLabel.Text = title
     end
 end
@@ -977,31 +1040,6 @@ function NexusUI:Destroy()
     -- Clean up tables
     self.Elements = nil
     self.Tabs = nil
-end
-
--- Add placeholder methods for advanced components (can be extended)
-function NexusUI:AddColorPickerToTab(tabName, colorConfig)
-    -- Implementation for color picker
-    warn("NexusUI: ColorPicker not implemented in this version")
-    return nil
-end
-
-function NexusUI:AddColorPickerToSection(sectionContent, colorConfig)
-    -- Implementation for color picker
-    warn("NexusUI: ColorPicker not implemented in this version")
-    return nil
-end
-
-function NexusUI:AddDropdownToTab(tabName, dropdownConfig)
-    -- Implementation for dropdown
-    warn("NexusUI: Dropdown not implemented in this version")
-    return nil
-end
-
-function NexusUI:AddDropdownToSection(sectionContent, dropdownConfig)
-    -- Implementation for dropdown
-    warn("NexusUI: Dropdown not implemented in this version")
-    return nil
 end
 
 return NexusUI
