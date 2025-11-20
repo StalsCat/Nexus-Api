@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
 
 -- Default Configuration
 NexusUI.DefaultConfig = {
@@ -39,6 +40,10 @@ NexusUI.DefaultColors = {
 function NexusUI.new(config)
     config = config or {}
     
+    -- Initialize Key System
+    local keySystemConfig = config.KeySystem or {Enabled = false}
+    local keySettings = keySystemConfig.KeySettings or {}
+    
     local self = setmetatable({
         Config = {
             WindowSize = config.WindowSize or NexusUI.DefaultConfig.WindowSize,
@@ -48,12 +53,37 @@ function NexusUI.new(config)
             ToggleKey = config.ToggleKey or NexusUI.DefaultConfig.ToggleKey
         },
         Colors = config.Colors or NexusUI.DefaultColors,
+        KeySystem = {
+            Enabled = keySystemConfig.Enabled or false,
+            KeySettings = {
+                Title = keySettings.Title or "Key System",
+                Subtitle = keySettings.Subtitle or "Enter your key",
+                Note = keySettings.Note or "No method of obtaining the key is provided",
+                FileName = keySettings.FileName or "Key",
+                SaveKey = keySettings.SaveKey or false,
+                GrabKeyFromSite = keySettings.GrabKeyFromSite or false,
+                Key = keySettings.Key or {"DemoKey-1234-5678-9012"},
+                KeysFromSite = keySettings.KeysFromSite or nil
+            },
+            CurrentKey = nil,
+            KeyValidated = false
+        },
         Elements = {},
         Tabs = {},
         CurrentTab = nil,
         Enabled = false,
         InputConnection = nil
     }, NexusUI)
+    
+    -- Load saved key if SaveKey is enabled
+    if self.KeySystem.Enabled and self.KeySystem.KeySettings.SaveKey then
+        self:LoadSavedKey()
+    end
+    
+    -- Get keys from site if enabled
+    if self.KeySystem.Enabled and self.KeySystem.KeySettings.GrabKeyFromSite then
+        self:GetKeysFromSite()
+    end
     
     self:Initialize()
     return self
@@ -64,12 +94,106 @@ function NexusUI:Initialize()
     self:CreateBlurEffect()
     self:CreateMainUI()
     self:SetupEventHandlers()
-    self:ShowMainUI()
+    
+    if self.KeySystem.Enabled and not self.KeySystem.KeyValidated then
+        self:ShowKeySystem()
+    else
+        self:ShowMainUI()
+    end
     
     print("=== NEXUS UI LIBRARY ===")
     print("Version: 2.0")
+    print("Key System:", self.KeySystem.Enabled and "ENABLED" or "DISABLED")
     print("Toggle Key:", self.Config.ToggleKey.Name)
     print("========================")
+end
+
+-- Key System Functions
+function NexusUI:LoadSavedKey()
+    if not self.KeySystem.KeySettings.SaveKey then return end
+    
+    local success, savedKey = pcall(function()
+        if readfile then
+            return readfile(self.KeySystem.KeySettings.FileName .. ".txt")
+        end
+        return nil
+    end)
+    
+    if success and savedKey then
+        if self:ValidateKey(savedKey) then
+            self.KeySystem.CurrentKey = savedKey
+            self.KeySystem.KeyValidated = true
+            print("✅ Loaded valid key from save file")
+        end
+    end
+end
+
+function NexusUI:SaveKeyToFile(key)
+    if not self.KeySystem.KeySettings.SaveKey then return end
+    
+    local success = pcall(function()
+        if writefile then
+            writefile(self.KeySystem.KeySettings.FileName .. ".txt", key)
+            return true
+        end
+        return false
+    end)
+    
+    return success
+end
+
+function NexusUI:GetKeysFromSite()
+    if not self.KeySystem.KeySettings.GrabKeyFromSite then return end
+    
+    local siteUrl = self.KeySystem.KeySettings.KeysFromSite
+    if not siteUrl then return end
+    
+    local success, keysData = pcall(function()
+        if syn and syn.request then
+            local response = syn.request({
+                Url = siteUrl,
+                Method = "GET"
+            })
+            return response.Body
+        elseif request then
+            local response = request({
+                Url = siteUrl,
+                Method = "GET"
+            })
+            return response.Body
+        end
+        return nil
+    end)
+    
+    if success and keysData then
+        -- Parse keys from site (assuming one key per line)
+        local keys = {}
+        for key in string.gmatch(keysData, "[^\r\n]+") do
+            if key and key ~= "" then
+                table.insert(keys, key)
+            end
+        end
+        
+        if #keys > 0 then
+            self.KeySystem.KeySettings.Key = keys
+            print("✅ Loaded " .. #keys .. " keys from site")
+        end
+    end
+end
+
+function NexusUI:ValidateKey(inputKey)
+    if not inputKey or type(inputKey) ~= "string" then return false end
+    
+    inputKey = string.upper(inputKey:gsub("%s+", ""))
+    
+    -- Check against local keys
+    for _, validKey in ipairs(self.KeySystem.KeySettings.Key) do
+        if string.upper(validKey:gsub("%s+", "")) == inputKey then
+            return true
+        end
+    end
+    
+    return false
 end
 
 -- Create blur effect
@@ -265,6 +389,9 @@ function NexusUI:CreateMainUI()
     self.ContentPages.BackgroundTransparency = 1
     self.ContentPages.Parent = self.MainContent
     
+    -- Create Key System UI
+    self:CreateKeySystem()
+    
     -- Dragging variables
     self.dragging = false
     self.dragInput = nil
@@ -272,8 +399,184 @@ function NexusUI:CreateMainUI()
     self.startPos = nil
 end
 
+-- Create Key System UI
+function NexusUI:CreateKeySystem()
+    self.KeySystemUI = Instance.new("Frame")
+    self.KeySystemUI.Name = "KeySystem"
+    self.KeySystemUI.Size = UDim2.new(0, 450, 0, 400)
+    self.KeySystemUI.Position = UDim2.new(0.5, -225, 0.5, -200)
+    self.KeySystemUI.BackgroundColor3 = self.Colors.Background
+    self.KeySystemUI.BackgroundTransparency = 1
+    self.KeySystemUI.Visible = false
+    self.KeySystemUI.Parent = self.ScreenGui
+    
+    local KeySystemCorner = Instance.new("UICorner")
+    KeySystemCorner.CornerRadius = self.Config.CornerRadius
+    KeySystemCorner.Parent = self.KeySystemUI
+    
+    local KeySystemStroke = Instance.new("UIStroke")
+    KeySystemStroke.Color = self.Colors.SurfaceLight
+    KeySystemStroke.Thickness = 1
+    KeySystemStroke.Parent = self.KeySystemUI
+    
+    -- Title Section
+    local KeyTitle = Instance.new("TextLabel")
+    KeyTitle.Name = "KeyTitle"
+    KeyTitle.Size = UDim2.new(1, 0, 0, 80)
+    KeyTitle.Position = UDim2.new(0, 0, 0, 0)
+    KeyTitle.BackgroundColor3 = self.Colors.Surface
+    KeyTitle.Text = self.KeySystem.KeySettings.Title
+    KeyTitle.TextColor3 = self.Colors.TextPrimary
+    KeyTitle.TextSize = 24
+    KeyTitle.Font = Enum.Font.GothamBold
+    KeyTitle.Parent = self.KeySystemUI
+    
+    local KeyTitleCorner = Instance.new("UICorner")
+    KeyTitleCorner.CornerRadius = UDim.new(0, 10)
+    KeyTitleCorner.Parent = KeyTitle
+    
+    -- Subtitle
+    local KeySubtitle = Instance.new("TextLabel")
+    KeySubtitle.Name = "KeySubtitle"
+    KeySubtitle.Size = UDim2.new(1, -40, 0, 30)
+    KeySubtitle.Position = UDim2.new(0, 20, 0, 90)
+    KeySubtitle.BackgroundTransparency = 1
+    KeySubtitle.Text = self.KeySystem.KeySettings.Subtitle
+    KeySubtitle.TextColor3 = self.Colors.TextSecondary
+    KeySubtitle.TextSize = 16
+    KeySubtitle.Font = Enum.Font.Gotham
+    KeySubtitle.TextXAlignment = Enum.TextXAlignment.Left
+    KeySubtitle.Parent = self.KeySystemUI
+    
+    -- Key Input
+    self.KeyInput = Instance.new("TextBox")
+    self.KeyInput.Name = "KeyInput"
+    self.KeyInput.Size = UDim2.new(1, -40, 0, 45)
+    self.KeyInput.Position = UDim2.new(0, 20, 0, 130)
+    self.KeyInput.BackgroundColor3 = self.Colors.SurfaceLight
+    self.KeyInput.TextColor3 = self.Colors.TextPrimary
+    self.KeyInput.Text = ""
+    self.KeyInput.PlaceholderText = "Введите ваш ключ..."
+    self.KeyInput.PlaceholderColor3 = self.Colors.TextSecondary
+    self.KeyInput.TextSize = 16
+    self.KeyInput.Font = Enum.Font.Gotham
+    self.KeyInput.Parent = self.KeySystemUI
+    
+    local KeyInputCorner = Instance.new("UICorner")
+    KeyInputCorner.CornerRadius = self.Config.CornerRadius
+    KeyInputCorner.Parent = self.KeyInput
+    
+    -- Submit Button
+    self.KeySubmit = Instance.new("TextButton")
+    self.KeySubmit.Name = "KeySubmit"
+    self.KeySubmit.Size = UDim2.new(1, -40, 0, 45)
+    self.KeySubmit.Position = UDim2.new(0, 20, 0, 190)
+    self.KeySubmit.BackgroundColor3 = self.Colors.Primary
+    self.KeySubmit.TextColor3 = self.Colors.TextPrimary
+    self.KeySubmit.Text = "АКТИВИРОВАТЬ"
+    self.KeySubmit.TextSize = 16
+    self.KeySubmit.Font = Enum.Font.GothamBold
+    self.KeySubmit.Parent = self.KeySystemUI
+    
+    local KeySubmitCorner = Instance.new("UICorner")
+    KeySubmitCorner.CornerRadius = self.Config.CornerRadius
+    KeySubmitCorner.Parent = self.KeySubmit
+    
+    -- Note Section
+    local KeyNote = Instance.new("TextLabel")
+    KeyNote.Name = "KeyNote"
+    KeyNote.Size = UDim2.new(1, -40, 0, 60)
+    KeyNote.Position = UDim2.new(0, 20, 0, 250)
+    KeyNote.BackgroundTransparency = 1
+    KeyNote.Text = self.KeySystem.KeySettings.Note
+    KeyNote.TextColor3 = self.Colors.TextSecondary
+    KeyNote.TextSize = 12
+    KeyNote.Font = Enum.Font.Gotham
+    KeyNote.TextWrapped = true
+    KeyNote.Parent = self.KeySystemUI
+    
+    -- Message Label
+    self.KeyMessage = Instance.new("TextLabel")
+    self.KeyMessage.Name = "KeyMessage"
+    self.KeyMessage.Size = UDim2.new(1, -40, 0, 40)
+    self.KeyMessage.Position = UDim2.new(0, 20, 0, 320)
+    self.KeyMessage.BackgroundTransparency = 1
+    self.KeyMessage.Text = "Введите ключ для доступа к интерфейсу"
+    self.KeyMessage.TextColor3 = self.Colors.TextSecondary
+    self.KeyMessage.TextSize = 14
+    self.KeyMessage.Font = Enum.Font.Gotham
+    self.KeyMessage.TextWrapped = true
+    self.KeyMessage.Parent = self.KeySystemUI
+end
+
+-- Key System Management
+function NexusUI:ShowKeySystem()
+    if not self.ScreenGui then return end
+    
+    self.ScreenGui.Enabled = true
+    self.KeySystemUI.Visible = true
+    self.KeySystemUI.BackgroundTransparency = 1
+    
+    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.5), {BackgroundTransparency = 0}):Play()
+    TweenService:Create(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount}):Play()
+    
+    -- Show available keys in console for debugging
+    if self.KeySystem.KeySettings.Key then
+        print("=== NEXUS KEY SYSTEM ===")
+        print("Доступные ключи:")
+        for i, key in ipairs(self.KeySystem.KeySettings.Key) do
+            print(key)
+        end
+        print("========================")
+    end
+end
+
+function NexusUI:HideKeySystem()
+    if not self.KeySystemUI then return end
+    
+    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+    wait(0.3)
+    self.KeySystemUI.Visible = false
+end
+
+function NexusUI:OnKeySubmit()
+    local key = self.KeyInput.Text
+    
+    if self:ValidateKey(key) then
+        self.KeySystem.CurrentKey = key
+        self.KeySystem.KeyValidated = true
+        self.KeyMessage.Text = "✅ Ключ принят! Загрузка..."
+        self.KeyMessage.TextColor3 = self.Colors.Success
+        
+        -- Save key if enabled
+        if self.KeySystem.KeySettings.SaveKey then
+            self:SaveKeyToFile(key)
+        end
+        
+        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Success}):Play()
+        
+        wait(1.5)
+        self:HideKeySystem()
+        self:ShowMainUI()
+    else
+        self.KeyMessage.Text = "❌ Неверный ключ! Попробуйте снова."
+        self.KeyMessage.TextColor3 = self.Colors.Error
+        
+        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Error}):Play()
+        wait(1)
+        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Primary}):Play()
+    end
+end
+
 -- Setup event handlers
 function NexusUI:SetupEventHandlers()
+    -- Key system events
+    if self.KeySubmit then
+        self.KeySubmit.MouseButton1Click:Connect(function()
+            self:OnKeySubmit()
+        end)
+    end
+    
     -- Dragging events
     if self.TopBar then
         self.TopBar.InputBegan:Connect(function(input)
@@ -316,7 +619,11 @@ function NexusUI:SetupEventHandlers()
         
         if input.KeyCode == self.Config.ToggleKey then
             if not self.Enabled then
-                self:ShowMainUI()
+                if self.KeySystem.Enabled and not self.KeySystem.KeyValidated then
+                    self:ShowKeySystem()
+                else
+                    self:ShowMainUI()
+                end
             else
                 self:HideMainUI()
             end
