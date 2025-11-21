@@ -1,4 +1,4 @@
--- NexusUI Library v1.1 (Fixed)
+-- NexusUI Library v1.3 (Stable)
 -- By StalsCat, ZestyKJScripts
 local NexusUI = {}
 NexusUI.__index = NexusUI
@@ -60,6 +60,37 @@ local function safeGetColor(colors, colorName, fallback)
     return colors[colorName] or fallback or Color3.fromRGB(255, 255, 255)
 end
 
+-- Improved validation function
+local function validateConfig(config, configType)
+    if not config or type(config) ~= "table" then
+        return false, "Config must be a table"
+    end
+    
+    if configType == "section" then
+        if not config.Name or type(config.Name) ~= "string" then
+            return false, "Section name is required and must be a string"
+        end
+    elseif configType == "tab" then
+        if not config.Name or type(config.Name) ~= "string" then
+            return false, "Tab name is required and must be a string"
+        end
+    elseif configType == "button" then
+        if not config.Name or type(config.Name) ~= "string" then
+            return false, "Button name is required and must be a string"
+        end
+    elseif configType == "toggle" then
+        if not config.Name or type(config.Name) ~= "string" then
+            return false, "Toggle name is required and must be a string"
+        end
+    elseif configType == "label" then
+        if not config.Text or type(config.Text) ~= "string" then
+            return false, "Label text is required and must be a string"
+        end
+    end
+    
+    return true
+end
+
 local function stringToKeyCode(keyString)
     if type(keyString) == "string" then
         local success, keyCode = pcall(function()
@@ -93,7 +124,7 @@ function NexusUI.new(config)
             BlurAmount = config.BlurAmount or NexusUI.DefaultConfig.BlurAmount,
             ToggleKey = config.ToggleKey or NexusUI.DefaultConfig.ToggleKey
         },
-        Colors = mergedColors, -- Use merged colors instead of simple OR
+        Colors = mergedColors,
         KeySystem = {
             Enabled = keySystemConfig.Enabled or false,
             KeySettings = {
@@ -114,7 +145,7 @@ function NexusUI.new(config)
         CurrentTab = nil,
         Enabled = false,
         InputConnection = nil,
-        Destroyed = false -- Track destruction state
+        Destroyed = false
     }, NexusUI)
     
     -- Validate critical properties
@@ -764,16 +795,13 @@ end
 function NexusUI:CreateTab(tabConfig)
     if self.Destroyed then return nil end
     
-    if not tabConfig or type(tabConfig) ~= "table" then
-        warn("NexusUI: Invalid tab configuration")
+    local isValid, errorMsg = validateConfig(tabConfig, "tab")
+    if not isValid then
+        warn("NexusUI: " .. errorMsg)
         return nil
     end
     
     local tabName = tabConfig.Name
-    if not tabName or type(tabName) ~= "string" then
-        warn("NexusUI: Tab name is required and must be a string")
-        return nil
-    end
     
     -- Validate parent containers exist
     if not self.NavigationList or not self.ContentPages then
@@ -825,8 +853,9 @@ function NexusUI:CreateTab(tabConfig)
     
     function tabAPI.AddButton(buttonConfig)
         if self.Destroyed then return nil end
-        if not buttonConfig or type(buttonConfig) ~= "table" then
-            warn("NexusUI: Invalid button configuration")
+        local isValid, errorMsg = validateConfig(buttonConfig, "button")
+        if not isValid then
+            warn("NexusUI: " .. errorMsg)
             return nil
         end
         return self:AddButtonToTab(tabName, buttonConfig)
@@ -834,8 +863,9 @@ function NexusUI:CreateTab(tabConfig)
     
     function tabAPI.AddToggle(toggleConfig)
         if self.Destroyed then return nil end
-        if not toggleConfig or type(toggleConfig) ~= "table" then
-            warn("NexusUI: Invalid toggle configuration")
+        local isValid, errorMsg = validateConfig(toggleConfig, "toggle")
+        if not isValid then
+            warn("NexusUI: " .. errorMsg)
             return nil
         end
         return self:AddToggleToTab(tabName, toggleConfig)
@@ -843,31 +873,17 @@ function NexusUI:CreateTab(tabConfig)
     
     function tabAPI.AddSection(sectionConfig)
         if self.Destroyed then return nil end
-        if not sectionConfig or type(sectionConfig) ~= "table" then
-            warn("NexusUI: Invalid section configuration")
-            return nil
-        end
         return self:AddSectionToTab(tabName, sectionConfig)
     end
     
     function tabAPI.AddLabel(labelConfig)
         if self.Destroyed then return nil end
-        if not labelConfig or type(labelConfig) ~= "table" then
-            warn("NexusUI: Invalid label configuration")
+        local isValid, errorMsg = validateConfig(labelConfig, "label")
+        if not isValid then
+            warn("NexusUI: " .. errorMsg)
             return nil
         end
         return self:AddLabelToTab(tabName, labelConfig)
-    end
-    
-    -- Placeholder methods for future features
-    function tabAPI.AddColorPicker(colorConfig)
-        warn("NexusUI: ColorPicker not implemented in this version")
-        return nil
-    end
-    
-    function tabAPI.AddDropdown(dropdownConfig)
-        warn("NexusUI: Dropdown not implemented in this version")
-        return nil
     end
     
     return tabAPI
@@ -1030,24 +1046,33 @@ function NexusUI:CreateContentPage(pageConfig)
     return page
 end
 
+-- FIXED SECTION CREATION FUNCTION
 function NexusUI:AddSectionToTab(tabName, sectionConfig)
-    if self.Destroyed or not self.Tabs[tabName] then 
+    if self.Destroyed then 
+        warn("NexusUI: Library is destroyed")
+        return nil 
+    end
+    
+    if not self.Tabs[tabName] then 
         warn("NexusUI: Tab '" .. tostring(tabName) .. "' does not exist")
         return nil
     end
     
-    if not sectionConfig or type(sectionConfig) ~= "table" then
-        warn("NexusUI: Invalid section configuration")
-        return nil
-    end
-    
-    if not sectionConfig.Name or type(sectionConfig.Name) ~= "string" then
-        warn("NexusUI: Section name is required and must be a string")
+    local isValid, errorMsg = validateConfig(sectionConfig, "section")
+    if not isValid then
+        warn("NexusUI: " .. errorMsg)
         return nil
     end
     
     local tab = self.Tabs[tabName]
+    
+    -- Create section with safe error handling
     local section = self:CreateRoundedFrame(tab.Page, UDim2.new(1, 0, 0, 50), nil, safeGetColor(self.Colors, "Surface"))
+    if not section then
+        warn("NexusUI: Failed to create section frame")
+        return nil
+    end
+    
     section.BackgroundTransparency = 0
     
     local title = Instance.new("TextLabel")
@@ -1055,7 +1080,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     title.Size = UDim2.new(1, -20, 0, 25)
     title.Position = UDim2.new(0, 15, 0, 12)
     title.BackgroundTransparency = 1
-    title.Text = sectionConfig.Name
+    title.Text = tostring(sectionConfig.Name)
     title.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     title.TextSize = 14
     title.Font = Enum.Font.GothamBold
@@ -1095,8 +1120,9 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     
     function sectionAPI.AddButton(buttonConfig)
         if self.Destroyed then return nil end
-        if not buttonConfig or type(buttonConfig) ~= "table" then
-            warn("NexusUI: Invalid button configuration")
+        local isValid, errorMsg = validateConfig(buttonConfig, "button")
+        if not isValid then
+            warn("NexusUI: " .. errorMsg)
             return nil
         end
         return self:CreateButton(content, buttonConfig)
@@ -1104,8 +1130,9 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     
     function sectionAPI.AddToggle(toggleConfig)
         if self.Destroyed then return nil end
-        if not toggleConfig or type(toggleConfig) ~= "table" then
-            warn("NexusUI: Invalid toggle configuration")
+        local isValid, errorMsg = validateConfig(toggleConfig, "toggle")
+        if not isValid then
+            warn("NexusUI: " .. errorMsg)
             return nil
         end
         return self:CreateToggle(content, toggleConfig)
@@ -1113,8 +1140,9 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     
     function sectionAPI.AddLabel(labelConfig)
         if self.Destroyed then return nil end
-        if not labelConfig or type(labelConfig) ~= "table" then
-            warn("NexusUI: Invalid label configuration")
+        local isValid, errorMsg = validateConfig(labelConfig, "label")
+        if not isValid then
+            warn("NexusUI: " .. errorMsg)
             return nil
         end
         return self:CreateLabel(content, labelConfig)
@@ -1145,8 +1173,9 @@ function NexusUI:CreateButton(parent, buttonConfig)
         return nil
     end
     
-    if not buttonConfig.Name or type(buttonConfig.Name) ~= "string" then
-        warn("NexusUI: Button name is required and must be a string")
+    local isValid, errorMsg = validateConfig(buttonConfig, "button")
+    if not isValid then
+        warn("NexusUI: " .. errorMsg)
         return nil
     end
     
@@ -1208,8 +1237,9 @@ function NexusUI:CreateToggle(parent, toggleConfig)
         return nil
     end
     
-    if not toggleConfig.Name or type(toggleConfig.Name) ~= "string" then
-        warn("NexusUI: Toggle name is required and must be a string")
+    local isValid, errorMsg = validateConfig(toggleConfig, "toggle")
+    if not isValid then
+        warn("NexusUI: " .. errorMsg)
         return nil
     end
     
@@ -1315,8 +1345,9 @@ function NexusUI:CreateLabel(parent, labelConfig)
         return nil
     end
     
-    if not labelConfig.Text or type(labelConfig.Text) ~= "string" then
-        warn("NexusUI: Label text is required and must be a string")
+    local isValid, errorMsg = validateConfig(labelConfig, "label")
+    if not isValid then
+        warn("NexusUI: " .. errorMsg)
         return nil
     end
     
