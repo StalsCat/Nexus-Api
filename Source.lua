@@ -722,30 +722,88 @@ function NexusUI:CreateTab(tabConfig)
     
     function tabAPI.AddButton(buttonConfig)
         if self.Destroyed then return nil end
-        local isValid = validateConfig(buttonConfig, "button")
-        if not isValid then return nil end
-        return self:AddButtonToTab(tabName, buttonConfig)
+        local isValid, err = validateConfig(buttonConfig, "button")
+        if not isValid then
+            warn("NexusUI: " .. err)
+            return nil
+        end
+        
+        local success, result = pcall(function()
+            return self:AddButtonToTab(tabName, buttonConfig)
+        end)
+        
+        if success then
+            return result
+        else
+            warn("NexusUI: Failed to add button: " .. tostring(result))
+            return nil
+        end
     end
     
     function tabAPI.AddToggle(toggleConfig)
         if self.Destroyed then return nil end
-        local isValid = validateConfig(toggleConfig, "toggle")
-        if not isValid then return nil end
-        return self:AddToggleToTab(tabName, toggleConfig)
+        local isValid, err = validateConfig(toggleConfig, "toggle")
+        if not isValid then
+            warn("NexusUI: " .. err)
+            return nil
+        end
+        
+        local success, result = pcall(function()
+            return self:AddToggleToTab(tabName, toggleConfig)
+        end)
+        
+        if success then
+            return result
+        else
+            warn("NexusUI: Failed to add toggle: " .. tostring(result))
+            return nil
+        end
     end
     
     function tabAPI.AddSection(sectionConfig)
         if self.Destroyed then return nil end
-        local isValid = validateConfig(sectionConfig, "section")
-        if not isValid then return nil end
-        return self:AddSectionToTab(tabName, sectionConfig)
+        local isValid, err = validateConfig(sectionConfig, "section")
+        if not isValid then
+            warn("NexusUI: " .. err)
+            return nil
+        end
+        
+        local success, result = pcall(function()
+            return self:AddSectionToTab(tabName, sectionConfig)
+        end)
+        
+        if success then
+            return result
+        else
+            warn("NexusUI: Failed to add section: " .. tostring(result))
+            return nil
+        end
     end
     
     function tabAPI.AddLabel(labelConfig)
         if self.Destroyed then return nil end
-        local isValid = validateConfig(labelConfig, "label")
-        if not isValid then return nil end
-        return self:AddLabelToTab(tabName, labelConfig)
+        local isValid, err = validateConfig(labelConfig, "label")
+        if not isValid then
+            warn("NexusUI: " .. err)
+            return nil
+        end
+        
+        local success, result = pcall(function()
+            return self:AddLabelToTab(tabName, labelConfig)
+        end)
+        
+        if success then
+            return result
+        else
+            warn("NexusUI: Failed to add label: " .. tostring(result))
+            return nil
+        end
+    end
+    
+    -- Проверяем что API создан корректно
+    if not tabAPI or type(tabAPI) ~= "table" then
+        warn("NexusUI: Failed to create tab API for: " .. tabName)
+        return nil
     end
     
     return tabAPI
@@ -862,6 +920,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     
     local tab = self.Tabs[tabName]
     
+    -- Создаем секцию
     local section = safeCreateInstance("Frame", {
         Name = sectionConfig.Name .. "Section",
         Size = UDim2.new(1, 0, 0, 50),
@@ -870,11 +929,15 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = tab.Page
     })
     
-    if not section then return nil end
+    if not section then 
+        warn("NexusUI: Failed to create section frame")
+        return nil 
+    end
     
     safeCreateInstance("UICorner", {CornerRadius = self.Config.CornerRadius, Parent = section})
     safeCreateInstance("UIStroke", {Color = safeGetColor(self.Colors, "SurfaceLight"), Thickness = 1, Parent = section})
     
+    -- Заголовок секции
     safeCreateInstance("TextLabel", {
         Name = "Title",
         Size = UDim2.new(1, -20, 0, 25),
@@ -888,6 +951,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = section
     })
     
+    -- Контентная область
     local content = safeCreateInstance("Frame", {
         Name = "Content",
         Size = UDim2.new(1, -20, 0, 0),
@@ -896,7 +960,10 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = section
     })
     
-    if not content then return nil end
+    if not content then 
+        warn("NexusUI: Failed to create section content")
+        return nil 
+    end
     
     local contentLayout = safeCreateInstance("UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder,
@@ -904,6 +971,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = content
     })
     
+    -- Автоматическое изменение размера
     contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         if content and content.Parent then
             content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
@@ -911,12 +979,14 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         end
     end)
     
+    -- Сохраняем секцию
     table.insert(tab.Elements, {
         Type = "Section",
         Object = section,
         Content = content
     })
     
+    -- Возвращаем API для работы с секцией
     local sectionAPI = {}
     
     function sectionAPI.AddButton(buttonConfig)
@@ -942,7 +1012,6 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     
     return sectionAPI
 end
-
 -- Element Creation
 function NexusUI:CreateButton(parent, buttonConfig)
     if not parent then return nil end
@@ -1175,10 +1244,16 @@ function NexusUI:OnKeySubmit()
     end
 end
 
--- Main UI Methods
 function NexusUI:ShowMainUI()
     if self.Destroyed then return end
     if not self.ScreenGui or not self.MainWindow then return end
+    
+    -- Устанавливаем начальное состояние для анимации
+    self.MainWindow.BackgroundTransparency = 1
+    self.MainWindow.Size = UDim2.new(0, 0, 0, 0)
+    self.MainWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    self.MainWindow.Visible = true
+    self.ScreenGui.Enabled = true
     
     pcall(function()
         if Players.LocalPlayer and self.AvatarImage then
@@ -1187,13 +1262,12 @@ function NexusUI:ShowMainUI()
         end
     end)
     
-    self.ScreenGui.Enabled = true
-    self.MainWindow.Visible = true
-    
+    -- Анимация появления
     self:SafeTween(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount})
-    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration), {
+    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         BackgroundTransparency = 0,
-        Size = self.Config.WindowSize
+        Size = self.Config.WindowSize,
+        Position = UDim2.new(0.5, -self.Config.WindowSize.X.Offset/2, 0.5, -self.Config.WindowSize.Y.Offset/2)
     })
     
     self.Enabled = true
@@ -1202,9 +1276,11 @@ end
 function NexusUI:HideMainUI()
     if self.Destroyed then return end
     
-    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration), {
+    -- Анимация исчезновения
+    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
         BackgroundTransparency = 1,
-        Size = UDim2.new(0, 0, 0, 0)
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
     })
     
     self:SafeTween(self.BlurEffect, TweenInfo.new(0.3), {Size = 0})
@@ -1290,4 +1366,5 @@ function NexusUI:Destroy()
 end
 
 return NexusUI
+
 
