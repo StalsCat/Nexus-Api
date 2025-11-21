@@ -1,5 +1,7 @@
--- NexusUI Library v2.0 (Ultra Stable)
+-- NexusUI Library v2.1 (Ultra Stable - Fixed Edition)
 -- By StalsCat, ZestyKJScripts
+-- Fixed by Assistant
+
 local NexusUI = {}
 NexusUI.__index = NexusUI
 
@@ -11,7 +13,7 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local HttpService = game:GetService("HttpService")
 
--- Default configurations with fallback values
+-- Default configurations
 NexusUI.DefaultConfig = {
     WindowSize = UDim2.new(0, 750, 0, 500),
     CornerRadius = UDim.new(0, 10),
@@ -34,7 +36,7 @@ NexusUI.DefaultColors = {
     Error = Color3.fromRGB(244, 67, 54)
 }
 
--- Enhanced deep merge function with type checking
+-- Utility functions
 local function deepMerge(defaultTable, userTable)
     if type(userTable) ~= "table" then 
         return table.clone(defaultTable)
@@ -54,7 +56,6 @@ local function deepMerge(defaultTable, userTable)
     return result
 end
 
--- Ultra-safe property access with comprehensive fallbacks
 local function safeGetColor(colors, colorName, fallback)
     if not colors or type(colors) ~= "table" then
         return fallback or Color3.fromRGB(255, 255, 255)
@@ -68,7 +69,6 @@ local function safeGetColor(colors, colorName, fallback)
     return color
 end
 
--- Advanced validation system
 local function validateConfig(config, configType)
     if config == nil then
         return false, configType .. " configuration is nil"
@@ -110,6 +110,9 @@ local function validateConfig(config, configType)
         if config.Name == "" then
             return false, "Button name cannot be empty"
         end
+        if config.Callback and type(config.Callback) ~= "function" then
+            return false, "Button callback must be a function"
+        end
         
     elseif configType == "toggle" then
         if not config.Name then
@@ -120,6 +123,9 @@ local function validateConfig(config, configType)
         end
         if config.Name == "" then
             return false, "Toggle name cannot be empty"
+        end
+        if config.Callback and type(config.Callback) ~= "function" then
+            return false, "Toggle callback must be a function"
         end
         
     elseif configType == "label" then
@@ -137,7 +143,6 @@ local function validateConfig(config, configType)
     return true
 end
 
--- Safe string to KeyCode conversion
 local function stringToKeyCode(keyString)
     if keyString == nil then
         return Enum.KeyCode.Insert
@@ -159,7 +164,6 @@ local function stringToKeyCode(keyString)
     return Enum.KeyCode.Insert
 end
 
--- Safe instance creation with error handling
 local function safeCreateInstance(className, properties)
     local success, instance = pcall(function()
         local inst = Instance.new(className)
@@ -181,27 +185,17 @@ local function safeCreateInstance(className, properties)
     end
 end
 
--- Main constructor with comprehensive validation
+-- Main constructor
 function NexusUI.new(config)
-    -- Validate input
-    if config and type(config) ~= "table" then
-        warn("NexusUI: Config must be a table or nil")
-        config = {}
-    end
-    
     config = config or {}
     
-    -- Safe key conversion
     local toggleKey = stringToKeyCode(config.ToggleKey)
     
-    -- Safe config processing
     local keySystemConfig = config.KeySystem or {Enabled = false}
     local keySettings = keySystemConfig.KeySettings or {}
     
-    -- Deep merge with validation
     local mergedColors = deepMerge(NexusUI.DefaultColors, config.Colors or {})
     
-    -- Create instance with all safety measures
     local self = setmetatable({
         Config = {
             WindowSize = typeof(config.WindowSize) == "UDim2" and config.WindowSize or NexusUI.DefaultConfig.WindowSize,
@@ -235,14 +229,12 @@ function NexusUI.new(config)
         Initialized = false
     }, NexusUI)
     
-    -- Initialize with error handling
     local success, err = pcall(function()
         self:Initialize()
     end)
     
     if not success then
         warn("NexusUI: Initialization failed: " .. tostring(err))
-        -- Return minimal functional instance
         self.Destroyed = true
     else
         self.Initialized = true
@@ -251,33 +243,7 @@ function NexusUI.new(config)
     return self
 end
 
--- Safe initialization
-function NexusUI:Initialize()
-    if self.Destroyed then 
-        warn("NexusUI: Cannot initialize destroyed instance")
-        return 
-    end
-    
-    -- Create UI components with error handling
-    local success, err = pcall(function()
-        self:CreateBlurEffect()
-        self:CreateMainUI()
-        self:SetupEventHandlers()
-        
-        if self.KeySystem.Enabled and not self.KeySystem.KeyValidated then
-            self:ShowKeySystem()
-        else
-            self:ShowMainUI()
-        end
-    end)
-    
-    if not success then
-        warn("NexusUI: UI creation failed: " .. tostring(err))
-        self.Destroyed = true
-    end
-end
-
--- Safe file operations
+-- Key System Implementation
 function NexusUI:LoadSavedKey()
     if not self.KeySystem.KeySettings.SaveKey then return end
     
@@ -295,8 +261,10 @@ function NexusUI:LoadSavedKey()
         if self:ValidateKey(savedKey) then
             self.KeySystem.CurrentKey = savedKey
             self.KeySystem.KeyValidated = true
+            return true
         end
     end
+    return false
 end
 
 function NexusUI:SaveKeyToFile(key)
@@ -314,7 +282,6 @@ function NexusUI:SaveKeyToFile(key)
     return success
 end
 
--- Safe HTTP requests
 function NexusUI:GetKeysFromSite()
     if not self.KeySystem.KeySettings.GrabKeyFromSite then return end
     
@@ -353,11 +320,12 @@ function NexusUI:GetKeysFromSite()
         
         if #keys > 0 then
             self.KeySystem.KeySettings.Key = keys
+            return true
         end
     end
+    return false
 end
 
--- Key validation with comprehensive checks
 function NexusUI:ValidateKey(inputKey)
     if not inputKey or type(inputKey) ~= "string" then return false end
     
@@ -375,12 +343,36 @@ function NexusUI:ValidateKey(inputKey)
     return false
 end
 
--- UI Creation with comprehensive error handling
+-- UI Creation
+function NexusUI:Initialize()
+    if self.Destroyed then return end
+    
+    local success, err = pcall(function()
+        self:CreateBlurEffect()
+        self:CreateMainUI()
+        self:SetupEventHandlers()
+        
+        if self.KeySystem.Enabled then
+            if self:LoadSavedKey() then
+                self:ShowMainUI()
+            else
+                self:ShowKeySystem()
+            end
+        else
+            self:ShowMainUI()
+        end
+    end)
+    
+    if not success then
+        warn("NexusUI: UI creation failed: " .. tostring(err))
+        self.Destroyed = true
+    end
+end
+
 function NexusUI:CreateBlurEffect()
     if self.Destroyed then return end
     
     pcall(function()
-        -- Clean up existing effect
         if self.BlurEffect and self.BlurEffect.Parent then
             self.BlurEffect:Destroy()
         end
@@ -394,13 +386,8 @@ end
 
 function NexusUI:CreateMainUI()
     if self.Destroyed then return end
-    if not self.Colors then 
-        warn("NexusUI: Colors table is missing")
-        return 
-    end
     
     local success, err = pcall(function()
-        -- Safe cleanup
         pcall(function()
             local oldUI = CoreGui:FindFirstChild("NexusUIModern")
             if oldUI then
@@ -408,7 +395,6 @@ function NexusUI:CreateMainUI()
             end
         end)
         
-        -- Create main ScreenGui
         self.ScreenGui = safeCreateInstance("ScreenGui", {
             Name = "NexusUIModern",
             Parent = CoreGui,
@@ -421,7 +407,6 @@ function NexusUI:CreateMainUI()
             error("Failed to create ScreenGui")
         end
         
-        -- Create main window
         self.MainWindow = safeCreateInstance("Frame", {
             Name = "MainWindow",
             Size = self.Config.WindowSize,
@@ -436,7 +421,6 @@ function NexusUI:CreateMainUI()
             error("Failed to create MainWindow")
         end
         
-        -- Add window styling
         safeCreateInstance("UICorner", {
             CornerRadius = self.Config.CornerRadius,
             Parent = self.MainWindow
@@ -448,7 +432,6 @@ function NexusUI:CreateMainUI()
             Parent = self.MainWindow
         })
         
-        -- Create top bar
         self.TopBar = safeCreateInstance("Frame", {
             Name = "TopBar",
             Size = UDim2.new(1, 0, 0, 40),
@@ -499,7 +482,6 @@ function NexusUI:CreateMainUI()
             Parent = self.CloseButton
         })
 
-        -- Main content area
         self.MainContent = safeCreateInstance("Frame", {
             Name = "MainContent",
             Size = UDim2.new(1, 0, 1, -40),
@@ -508,7 +490,6 @@ function NexusUI:CreateMainUI()
             Parent = self.MainWindow
         })
 
-        -- Sidebar
         self.Sidebar = safeCreateInstance("Frame", {
             Name = "Sidebar",
             Size = UDim2.new(0, 200, 1, 0),
@@ -521,7 +502,6 @@ function NexusUI:CreateMainUI()
             Parent = self.Sidebar
         })
 
-        -- Navigation
         self.NavigationList = safeCreateInstance("ScrollingFrame", {
             Name = "NavigationList",
             Size = UDim2.new(1, -20, 1, -100),
@@ -539,7 +519,6 @@ function NexusUI:CreateMainUI()
             Parent = self.NavigationList
         })
 
-        -- Profile section
         self.ProfileSection = safeCreateInstance("Frame", {
             Name = "ProfileSection",
             Size = UDim2.new(1, -20, 0, 80),
@@ -608,7 +587,6 @@ function NexusUI:CreateMainUI()
             Parent = self.ProfileSection
         })
         
-        -- Content pages
         self.ContentPages = safeCreateInstance("Frame", {
             Name = "ContentPages",
             Size = UDim2.new(1, -200, 1, 0),
@@ -617,10 +595,8 @@ function NexusUI:CreateMainUI()
             Parent = self.MainContent
         })
 
-        -- Key system UI
         self:CreateKeySystem()
         
-        -- Drag system
         self.dragging = false
         self.dragInput = nil
         self.dragStart = nil
@@ -633,7 +609,6 @@ function NexusUI:CreateMainUI()
     end
 end
 
--- Key system UI creation
 function NexusUI:CreateKeySystem()
     if self.Destroyed or not self.Colors then return end
     
@@ -661,8 +636,7 @@ function NexusUI:CreateKeySystem()
             Parent = self.KeySystemUI
         })
         
-        -- Key system components...
-        safeCreateInstance("TextLabel", {
+        local KeyTitle = safeCreateInstance("TextLabel", {
             Name = "KeyTitle",
             Size = UDim2.new(1, 0, 0, 80),
             Position = UDim2.new(0, 0, 0, 0),
@@ -674,7 +648,92 @@ function NexusUI:CreateKeySystem()
             Parent = self.KeySystemUI
         })
         
-        -- ... (other key system elements)
+        safeCreateInstance("UICorner", {
+            CornerRadius = UDim.new(0, 10),
+            Parent = KeyTitle
+        })
+        
+        local KeySubtitle = safeCreateInstance("TextLabel", {
+            Name = "KeySubtitle",
+            Size = UDim2.new(1, -40, 0, 30),
+            Position = UDim2.new(0, 20, 0, 90),
+            BackgroundTransparency = 1,
+            Text = self.KeySystem.KeySettings.Subtitle,
+            TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+            TextSize = 16,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = self.KeySystemUI
+        })
+        
+        self.KeyInput = safeCreateInstance("TextBox", {
+            Name = "KeyInput",
+            Size = UDim2.new(1, -40, 0, 45),
+            Position = UDim2.new(0, 20, 0, 130),
+            BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
+            TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+            Text = "",
+            PlaceholderText = "Введите ключ...",
+            PlaceholderColor3 = safeGetColor(self.Colors, "TextSecondary"),
+            TextSize = 14,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = self.KeySystemUI
+        })
+        
+        safeCreateInstance("UICorner", {
+            CornerRadius = UDim.new(0, 8),
+            Parent = self.KeyInput
+        })
+        
+        safeCreateInstance("UIStroke", {
+            Color = safeGetColor(self.Colors, "SurfaceLight"),
+            Thickness = 1,
+            Parent = self.KeyInput
+        })
+        
+        self.KeySubmit = safeCreateInstance("TextButton", {
+            Name = "KeySubmit",
+            Size = UDim2.new(1, -40, 0, 45),
+            Position = UDim2.new(0, 20, 0, 190),
+            BackgroundColor3 = safeGetColor(self.Colors, "Primary"),
+            TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+            Text = "ПРОВЕРИТЬ КЛЮЧ",
+            TextSize = 16,
+            Font = Enum.Font.GothamBold,
+            Parent = self.KeySystemUI
+        })
+        
+        safeCreateInstance("UICorner", {
+            CornerRadius = UDim.new(0, 8),
+            Parent = self.KeySubmit
+        })
+        
+        local KeyNote = safeCreateInstance("TextLabel", {
+            Name = "KeyNote",
+            Size = UDim2.new(1, -40, 0, 40),
+            Position = UDim2.new(0, 20, 1, -50),
+            BackgroundTransparency = 1,
+            Text = self.KeySystem.KeySettings.Note,
+            TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            TextWrapped = true,
+            Parent = self.KeySystemUI
+        })
+        
+        self.KeyStatus = safeCreateInstance("TextLabel", {
+            Name = "KeyStatus",
+            Size = UDim2.new(1, -40, 0, 20),
+            Position = UDim2.new(0, 20, 0, 245),
+            BackgroundTransparency = 1,
+            Text = "",
+            TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+            TextSize = 12,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = self.KeySystemUI
+        })
     end)
     
     if not success then
@@ -682,11 +741,9 @@ function NexusUI:CreateKeySystem()
     end
 end
 
--- Event handling with comprehensive safety
 function NexusUI:SetupEventHandlers()
     if self.Destroyed then return end
     
-    -- Safe event connections
     local function safeConnectEvent(object, event, callback)
         if object and object.Parent then
             pcall(function()
@@ -695,12 +752,16 @@ function NexusUI:SetupEventHandlers()
         end
     end
     
-    -- Key system events
     safeConnectEvent(self.KeySubmit, "MouseButton1Click", function()
         self:OnKeySubmit()
     end)
     
-    -- Drag events
+    safeConnectEvent(self.KeyInput, "FocusLost", function(enterPressed)
+        if enterPressed then
+            self:OnKeySubmit()
+        end
+    end)
+    
     safeConnectEvent(self.TopBar, "InputBegan", function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             self.dragging = true
@@ -716,17 +777,19 @@ function NexusUI:SetupEventHandlers()
     end)
     
     safeConnectEvent(self.TopBar, "InputChanged", function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            self.dragInput = input
+        if input.UserInputType == Enum.UserInputType.MouseMovement and self.dragging then
+            local delta = input.Position - self.dragStart
+            self.MainWindow.Position = UDim2.new(
+                self.startPos.X.Scale, self.startPos.X.Offset + delta.X,
+                self.startPos.Y.Scale, self.startPos.Y.Offset + delta.Y
+            )
         end
     end)
     
-    -- Close button
     safeConnectEvent(self.CloseButton, "MouseButton1Click", function()
         self:HideMainUI()
     end)
     
-    -- Input handling
     self.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         
@@ -743,7 +806,6 @@ function NexusUI:SetupEventHandlers()
         end
     end)
     
-    -- Player cleanup
     if Players.LocalPlayer then
         Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
             if not parent then
@@ -753,7 +815,6 @@ function NexusUI:SetupEventHandlers()
     end
 end
 
--- Ultra-safe tweening system
 function NexusUI:SafeTween(object, tweenInfo, properties)
     if self.Destroyed then return nil end
     if not object or not object.Parent then return nil end
@@ -761,7 +822,6 @@ function NexusUI:SafeTween(object, tweenInfo, properties)
     if not properties or type(properties) ~= "table" then return nil end
     
     local success, tween = pcall(function()
-        -- Validate properties
         local validProperties = {}
         for property, value in pairs(properties) do
             if object[property] ~= nil then
@@ -786,12 +846,9 @@ function NexusUI:SafeTween(object, tweenInfo, properties)
     end
 end
 
--- Tab management with maximum safety
+-- Tab Management
 function NexusUI:CreateTab(tabConfig)
-    if self.Destroyed then 
-        warn("NexusUI: Cannot create tab on destroyed instance")
-        return nil 
-    end
+    if self.Destroyed then return nil end
     
     local isValid, errorMsg = validateConfig(tabConfig, "tab")
     if not isValid then
@@ -801,7 +858,6 @@ function NexusUI:CreateTab(tabConfig)
     
     local tabName = tabConfig.Name
     
-    -- Validate UI structure
     if not self.NavigationList or not self.NavigationList.Parent then
         warn("NexusUI: NavigationList is not available")
         return nil
@@ -812,7 +868,6 @@ function NexusUI:CreateTab(tabConfig)
         return nil
     end
     
-    -- Create tab elements
     local navButton = self:CreateNavButton(tabConfig)
     local contentPage = self:CreateContentPage(tabConfig)
     
@@ -821,24 +876,20 @@ function NexusUI:CreateTab(tabConfig)
         return nil
     end
     
-    -- Store tab data
     self.Tabs[tabName] = {
         Button = navButton,
         Page = contentPage,
         Elements = {}
     }
     
-    -- Set up tab selection
-    safeConnectEvent(navButton, "MouseButton1Click", function()
+    navButton.MouseButton1Click:Connect(function()
         self:SelectTab(tabName)
     end)
     
-    -- Auto-select first tab
     if not self.CurrentTab then
-        self.CurrentTab = tabName
+        self:SelectTab(tabName)
     end
     
-    -- Create tab API
     local tabAPI = {}
     
     function tabAPI.AddButton(buttonConfig)
@@ -872,11 +923,110 @@ function NexusUI:CreateTab(tabConfig)
     return tabAPI
 end
 
--- Safe section creation (the previously problematic function)
+function NexusUI:CreateNavButton(navConfig)
+    local button = safeCreateInstance("TextButton", {
+        Name = navConfig.Name .. "Nav",
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight"),
+        Text = "",
+        Parent = self.NavigationList
+    })
+    
+    if not button then return nil end
+    
+    safeCreateInstance("UICorner", {
+        CornerRadius = UDim.new(0, 8),
+        Parent = button
+    })
+    
+    safeCreateInstance("UIStroke", {
+        Color = safeGetColor(self.Colors, "Primary"),
+        Thickness = 1,
+        Parent = button
+    })
+    
+    local buttonText = safeCreateInstance("TextLabel", {
+        Name = "ButtonText",
+        Size = UDim2.new(1, -20, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        Text = navConfig.Name,
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = button
+    })
+    
+    button.MouseEnter:Connect(function()
+        self:SafeTween(button, TweenInfo.new(0.2), {
+            BackgroundColor3 = safeGetColor(self.Colors, "Primary")
+        })
+    end)
+    
+    button.MouseLeave:Connect(function()
+        self:SafeTween(button, TweenInfo.new(0.2), {
+            BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")
+        })
+    end)
+    
+    return button
+end
+
+function NexusUI:CreateContentPage(pageConfig)
+    local page = safeCreateInstance("ScrollingFrame", {
+        Name = pageConfig.Name .. "Page",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = safeGetColor(self.Colors, "SurfaceLight"),
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        Visible = false,
+        Parent = self.ContentPages
+    })
+    
+    if not page then return nil end
+    
+    local pageLayout = safeCreateInstance("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 10),
+        Parent = page
+    })
+    
+    safeCreateInstance("UIPadding", {
+        PaddingTop = UDim.new(0, 10),
+        PaddingLeft = UDim.new(0, 10),
+        PaddingRight = UDim.new(0, 10),
+        Parent = page
+    })
+    
+    pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, pageLayout.AbsoluteContentSize.Y + 10)
+    end)
+    
+    return page
+end
+
+function NexusUI:SelectTab(tabName)
+    if not self.Tabs[tabName] then return end
+    
+    for name, tab in pairs(self.Tabs) do
+        tab.Page.Visible = (name == tabName)
+        if tab.Button then
+            local targetColor = name == tabName and safeGetColor(self.Colors, "Primary") or safeGetColor(self.Colors, "SurfaceLight")
+            self:SafeTween(tab.Button, TweenInfo.new(0.2), {
+                BackgroundColor3 = targetColor
+            })
+        end
+    end
+    
+    self.CurrentTab = tabName
+end
+
+-- Section Management
 function NexusUI:AddSectionToTab(tabName, sectionConfig)
     if self.Destroyed then return nil end
     
-    -- Validate inputs
     if not self.Tabs[tabName] then 
         warn("NexusUI: Tab not found: " .. tostring(tabName))
         return nil
@@ -890,16 +1040,25 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     
     local tab = self.Tabs[tabName]
     
-    -- Create section container
-    local section = self:CreateRoundedFrame(tab.Page, UDim2.new(1, 0, 0, 50), nil, safeGetColor(self.Colors, "Surface"))
-    if not section then
-        warn("NexusUI: Failed to create section frame")
-        return nil
-    end
+    local section = safeCreateInstance("Frame", {
+        Name = sectionConfig.Name .. "Section",
+        Size = UDim2.new(1, 0, 0, 50),
+        BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
+        BackgroundTransparency = 0,
+        Parent = tab.Page
+    })
     
-    section.BackgroundTransparency = 0
+    safeCreateInstance("UICorner", {
+        CornerRadius = self.Config.CornerRadius,
+        Parent = section
+    })
     
-    -- Section title
+    safeCreateInstance("UIStroke", {
+        Color = safeGetColor(self.Colors, "SurfaceLight"),
+        Thickness = 1,
+        Parent = section
+    })
+    
     safeCreateInstance("TextLabel", {
         Name = "Title",
         Size = UDim2.new(1, -20, 0, 25),
@@ -913,7 +1072,6 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = section
     })
     
-    -- Section content area
     local content = safeCreateInstance("Frame", {
         Name = "Content",
         Size = UDim2.new(1, -20, 0, 0),
@@ -928,22 +1086,17 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = content
     })
     
-    -- Dynamic sizing
-    safeConnectEvent(contentLayout, "AbsoluteContentSize", function()
-        if content and content.Parent then
-            content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
-            section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
-        end
+    contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
+        section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
     end)
     
-    -- Store section
     table.insert(tab.Elements, {
         Type = "Section",
         Object = section,
         Content = content
     })
     
-    -- Section API
     local sectionAPI = {}
     
     function sectionAPI.AddButton(buttonConfig)
@@ -970,66 +1123,282 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     return sectionAPI
 end
 
--- Safe UI element creation functions
-function NexusUI:CreateNavButton(navConfig)
-    if not navConfig or not navConfig.Name then return nil end
-    
+-- Element Creation
+function NexusUI:CreateButton(parent, buttonConfig)
     local button = safeCreateInstance("TextButton", {
-        Name = navConfig.Name .. "Nav",
-        Size = UDim2.new(1, 0, 0, 40),
-        BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight"),
+        Name = buttonConfig.Name .. "Button",
+        Size = UDim2.new(1, 0, 0, 35),
+        BackgroundColor3 = safeGetColor(self.Colors, "Primary"),
         Text = "",
-        Parent = self.NavigationList
-    })
-    
-    if not button then return nil end
-    
-    -- Add button styling and functionality...
-    return button
-end
-
-function NexusUI:CreateContentPage(pageConfig)
-    if not pageConfig or not pageConfig.Name then return nil end
-    
-    local page = safeCreateInstance("ScrollingFrame", {
-        Name = pageConfig.Name .. "Page",
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        ScrollBarThickness = 4,
-        ScrollBarImageColor3 = safeGetColor(self.Colors, "SurfaceLight"),
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        Visible = false,
-        Parent = self.ContentPages
-    })
-    
-    if not page then return nil end
-    
-    -- Add page layout...
-    return page
-end
-
--- Safe rounded frame creation
-function NexusUI:CreateRoundedFrame(parent, size, position, backgroundColor)
-    if not parent then return nil end
-    
-    local frame = safeCreateInstance("Frame", {
-        Size = size or UDim2.new(1, 0, 1, 0),
-        Position = position or UDim2.new(0, 0, 0, 0),
-        BackgroundColor3 = backgroundColor or safeGetColor(self.Colors, "Surface"),
         Parent = parent
     })
     
-    if frame then
-        safeCreateInstance("UICorner", {
-            CornerRadius = self.Config.CornerRadius,
-            Parent = frame
-        })
-    end
+    safeCreateInstance("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = button
+    })
     
-    return frame
+    local buttonText = safeCreateInstance("TextLabel", {
+        Name = "ButtonText",
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = buttonConfig.Name,
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        Parent = button
+    })
+    
+    button.MouseButton1Click:Connect(function()
+        if buttonConfig.Callback then
+            pcall(buttonConfig.Callback)
+        end
+    end)
+    
+    button.MouseEnter:Connect(function()
+        self:SafeTween(button, TweenInfo.new(0.2), {
+            BackgroundColor3 = safeGetColor(self.Colors, "PrimaryDark")
+        })
+    end)
+    
+    button.MouseLeave:Connect(function()
+        self:SafeTween(button, TweenInfo.new(0.2), {
+            BackgroundColor3 = safeGetColor(self.Colors, "Primary")
+        })
+    end)
+    
+    return button
 end
 
--- Public API methods with safety
+function NexusUI:CreateToggle(parent, toggleConfig)
+    local toggleFrame = safeCreateInstance("Frame", {
+        Name = toggleConfig.Name .. "Toggle",
+        Size = UDim2.new(1, 0, 0, 35),
+        BackgroundTransparency = 1,
+        Parent = parent
+    })
+    
+    local toggleButton = safeCreateInstance("TextButton", {
+        Name = "ToggleButton",
+        Size = UDim2.new(0, 35, 0, 35),
+        Position = UDim2.new(1, -35, 0, 0),
+        BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight"),
+        Text = "",
+        Parent = toggleFrame
+    })
+    
+    safeCreateInstance("UICorner", {
+        CornerRadius = UDim.new(0, 6),
+        Parent = toggleButton
+    })
+    
+    local toggleIndicator = safeCreateInstance("Frame", {
+        Name = "ToggleIndicator",
+        Size = UDim2.new(0, 15, 0, 15),
+        Position = UDim2.new(0.5, -7.5, 0.5, -7.5),
+        BackgroundColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        Parent = toggleButton
+    })
+    
+    safeCreateInstance("UICorner", {
+        CornerRadius = UDim.new(1, 0),
+        Parent = toggleIndicator
+    })
+    
+    local toggleLabel = safeCreateInstance("TextLabel", {
+        Name = "ToggleLabel",
+        Size = UDim2.new(1, -45, 1, 0),
+        BackgroundTransparency = 1,
+        Text = toggleConfig.Name,
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        TextSize = 14,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = toggleFrame
+    })
+    
+    local state = toggleConfig.Default or false
+    toggleIndicator.Visible = state
+    
+    toggleButton.MouseButton1Click:Connect(function()
+        state = not state
+        toggleIndicator.Visible = state
+        
+        if state then
+            self:SafeTween(toggleButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = safeGetColor(self.Colors, "Primary")
+            })
+        else
+            self:SafeTween(toggleButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")
+            })
+        end
+        
+        if toggleConfig.Callback then
+            pcall(toggleConfig.Callback, state)
+        end
+    end)
+    
+    return {
+        SetState = function(newState)
+            state = newState
+            toggleIndicator.Visible = state
+            if state then
+                self:SafeTween(toggleButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = safeGetColor(self.Colors, "Primary")
+                })
+            else
+                self:SafeTween(toggleButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")
+                })
+            end
+        end,
+        GetState = function()
+            return state
+        end
+    }
+end
+
+function NexusUI:CreateLabel(parent, labelConfig)
+    local label = safeCreateInstance("TextLabel", {
+        Name = "Label",
+        Size = UDim2.new(1, 0, 0, 25),
+        BackgroundTransparency = 1,
+        Text = labelConfig.Text,
+        TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+        TextSize = 14,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextWrapped = true,
+        Parent = parent
+    })
+    
+    return label
+end
+
+function NexusUI:AddButtonToTab(tabName, buttonConfig)
+    if not self.Tabs[tabName] then return nil end
+    return self:CreateButton(self.Tabs[tabName].Page, buttonConfig)
+end
+
+function NexusUI:AddToggleToTab(tabName, toggleConfig)
+    if not self.Tabs[tabName] then return nil end
+    return self:CreateToggle(self.Tabs[tabName].Page, toggleConfig)
+end
+
+function NexusUI:AddLabelToTab(tabName, labelConfig)
+    if not self.Tabs[tabName] then return nil end
+    return self:CreateLabel(self.Tabs[tabName].Page, labelConfig)
+end
+
+-- Key System Methods
+function NexusUI:ShowKeySystem()
+    if self.Destroyed then return end
+    if not self.KeySystemUI then return end
+    
+    self.KeySystemUI.Visible = true
+    self.ScreenGui.Enabled = true
+    
+    self:SafeTween(self.KeySystemUI, TweenInfo.new(self.Config.AnimationDuration), {
+        BackgroundTransparency = 0
+    })
+    
+    if self.KeySystem.KeySettings.GrabKeyFromSite then
+        self:GetKeysFromSite()
+    end
+end
+
+function NexusUI:HideKeySystem()
+    if self.Destroyed then return end
+    if not self.KeySystemUI then return end
+    
+    self:SafeTween(self.KeySystemUI, TweenInfo.new(self.Config.AnimationDuration), {
+        BackgroundTransparency = 1
+    })
+    
+    delay(self.Config.AnimationDuration, function()
+        if self.KeySystemUI then
+            self.KeySystemUI.Visible = false
+        end
+    end)
+end
+
+function NexusUI:OnKeySubmit()
+    if self.Destroyed then return end
+    
+    local inputKey = self.KeyInput.Text
+    if not inputKey or inputKey == "" then
+        self.KeyStatus.Text = "Пожалуйста, введите ключ"
+        self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Error")
+        return
+    end
+    
+    if self:ValidateKey(inputKey) then
+        self.KeySystem.CurrentKey = inputKey
+        self.KeySystem.KeyValidated = true
+        self.KeyStatus.Text = "Ключ верный! Загрузка..."
+        self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Success")
+        
+        if self.KeySystem.KeySettings.SaveKey then
+            self:SaveKeyToFile(inputKey)
+        end
+        
+        delay(1, function()
+            self:HideKeySystem()
+            self:ShowMainUI()
+        end)
+    else
+        self.KeyStatus.Text = "Неверный ключ"
+        self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Error")
+    end
+end
+
+-- Main UI Methods
+function NexusUI:ShowMainUI()
+    if self.Destroyed then return end
+    if not self.ScreenGui or not self.MainWindow then return end
+    
+    pcall(function()
+        if Players.LocalPlayer then
+            local userId = Players.LocalPlayer.UserId
+            self.AvatarImage.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
+        end
+    end)
+    
+    self.ScreenGui.Enabled = true
+    self.MainWindow.Visible = true
+    
+    self:SafeTween(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount})
+    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration), {
+        BackgroundTransparency = 0,
+        Size = self.Config.WindowSize
+    })
+    
+    self.Enabled = true
+end
+
+function NexusUI:HideMainUI()
+    if self.Destroyed then return end
+    
+    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration), {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0, 0, 0, 0)
+    })
+    
+    self:SafeTween(self.BlurEffect, TweenInfo.new(0.3), {Size = 0})
+    
+    delay(self.Config.AnimationDuration, function()
+        if self.MainWindow then
+            self.MainWindow.Visible = false
+        end
+        if self.ScreenGui then
+            self.ScreenGui.Enabled = false
+        end
+        self.Enabled = false
+    end)
+end
+
+-- Public API
 function NexusUI:SetTitle(title)
     if self.Destroyed then return end
     if not title or type(title) ~= "string" then return end
@@ -1067,20 +1436,17 @@ function NexusUI:Hide()
     self:HideMainUI()
 end
 
--- Enhanced destruction with comprehensive cleanup
 function NexusUI:Destroy()
     if self.Destroyed then return end
     
     self.Destroyed = true
     self.Enabled = false
     
-    -- Disconnect events
     if self.InputConnection then
         pcall(function() self.InputConnection:Disconnect() end)
         self.InputConnection = nil
     end
     
-    -- Clean up UI elements
     local function safeDestroy(obj)
         if obj and obj.Parent then
             pcall(function() obj:Destroy() end)
@@ -1090,13 +1456,11 @@ function NexusUI:Destroy()
     safeDestroy(self.ScreenGui)
     safeDestroy(self.BlurEffect)
     
-    -- Clear tables
     self.Elements = nil
     self.Tabs = nil
     self.Colors = nil
     self.Config = nil
     
-    -- Prevent any further use
     setmetatable(self, {
         __index = function()
             error("NexusUI: Instance has been destroyed")
@@ -1105,120 +1469,6 @@ function NexusUI:Destroy()
             error("NexusUI: Instance has been destroyed")
         end
     })
-end
-
--- Show/hide methods with safety
-function NexusUI:ShowMainUI()
-    if self.Destroyed then return end
-    if not self.ScreenGui or not self.MainWindow then return end
-    
-    -- Safe avatar loading
-    pcall(function()
-        if Players.LocalPlayer then
-            local userId = Players.LocalPlayer.UserId
-            self.AvatarImage.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
-        end
-    end)
-    
-    self.ScreenGui.Enabled = true
-    self.MainWindow.Visible = true
-    
-    -- Safe animations
-    self:SafeTween(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount})
-    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration), {
-        BackgroundTransparency = 0,
-        Size = self.Config.WindowSize
-    })
-    
-    self.Enabled = true
-end
-
-function NexusUI:HideMainUI()
-    if self.Destroyed then return end
-    
-    self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration), {
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0, 0, 0, 0)
-    })
-    
-    self:SafeTween(self.BlurEffect, TweenInfo.new(0.3), {Size = 0})
-    
-    delay(self.Config.AnimationDuration, function()
-        if self.MainWindow then
-            self.MainWindow.Visible = false
-        end
-        if self.ScreenGui then
-            self.ScreenGui.Enabled = false
-        end
-        self.Enabled = false
-    end)
-end
-
--- Key system methods
-function NexusUI:ShowKeySystem()
-    if self.Destroyed then return end
-    -- Implementation...
-end
-
-function NexusUI:HideKeySystem()
-    if self.Destroyed then return end
-    -- Implementation...
-end
-
-function NexusUI:OnKeySubmit()
-    if self.Destroyed then return end
-    -- Implementation...
-end
-
--- Selection methods
-function NexusUI:SelectTab(tabName)
-    if self.Destroyed then return end
-    if not self.Tabs[tabName] then return end
-    -- Implementation...
-end
-
--- Element creation methods (buttons, toggles, labels)
-function NexusUI:CreateButton(parent, buttonConfig)
-    if self.Destroyed then return nil end
-    -- Implementation with safety...
-    return nil -- placeholder
-end
-
-function NexusUI:CreateToggle(parent, toggleConfig)
-    if self.Destroyed then return nil end
-    -- Implementation with safety...
-    return nil -- placeholder
-end
-
-function NexusUI:CreateLabel(parent, labelConfig)
-    if self.Destroyed then return nil end
-    -- Implementation with safety...
-    return nil -- placeholder
-end
-
-function NexusUI:AddButtonToTab(tabName, buttonConfig)
-    if self.Destroyed then return nil end
-    -- Implementation...
-    return nil -- placeholder
-end
-
-function NexusUI:AddToggleToTab(tabName, toggleConfig)
-    if self.Destroyed then return nil end
-    -- Implementation...
-    return nil -- placeholder
-end
-
-function NexusUI:AddLabelToTab(tabName, labelConfig)
-    if self.Destroyed then return nil end
-    -- Implementation...
-    return nil -- placeholder
-end
-
--- Input handling
-function NexusUI:UpdateInput(input)
-    if self.Destroyed then return end
-    if not self.MainWindow or not self.dragging then return end
-    -- Implementation...
 end
 
 return NexusUI
