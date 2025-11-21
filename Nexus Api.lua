@@ -1,6 +1,5 @@
--- NexusUI Library v2.0
--- Модульная библиотека для создания современных UI интерфейсов
-
+-- NexusUI Library v1.0
+-- By StalsCat, ZestyKJScripts
 local NexusUI = {}
 NexusUI.__index = NexusUI
 
@@ -12,7 +11,6 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local HttpService = game:GetService("HttpService")
 
--- Default Configuration
 NexusUI.DefaultConfig = {
     WindowSize = UDim2.new(0, 750, 0, 500),
     CornerRadius = UDim.new(0, 10),
@@ -21,7 +19,6 @@ NexusUI.DefaultConfig = {
     ToggleKey = Enum.KeyCode.Insert
 }
 
--- Default Color Scheme
 NexusUI.DefaultColors = {
     Primary = Color3.fromRGB(140, 100, 220),
     PrimaryDark = Color3.fromRGB(110, 80, 190),
@@ -36,11 +33,25 @@ NexusUI.DefaultColors = {
     Error = Color3.fromRGB(244, 67, 54)
 }
 
--- Create new NexusUI instance
+local function stringToKeyCode(keyString)
+    if type(keyString) == "string" then
+        local success, keyCode = pcall(function()
+            return Enum.KeyCode[keyString]
+        end)
+        if success and keyCode then
+            return keyCode
+        end
+    end
+    return keyString or Enum.KeyCode.Insert
+end
+
 function NexusUI.new(config)
     config = config or {}
     
-    -- Initialize Key System
+    if config.ToggleKey and type(config.ToggleKey) == "string" then
+        config.ToggleKey = stringToKeyCode(config.ToggleKey)
+    end
+    
     local keySystemConfig = config.KeySystem or {Enabled = false}
     local keySettings = keySystemConfig.KeySettings or {}
     
@@ -100,15 +111,8 @@ function NexusUI:Initialize()
     else
         self:ShowMainUI()
     end
-    
-    print("=== NEXUS UI LIBRARY ===")
-    print("Version: 2.0")
-    print("Key System:", self.KeySystem.Enabled and "ENABLED" or "DISABLED")
-    print("Toggle Key:", self.Config.ToggleKey.Name)
-    print("========================")
 end
 
--- Key System Functions
 function NexusUI:LoadSavedKey()
     if not self.KeySystem.KeySettings.SaveKey then return end
     
@@ -123,7 +127,7 @@ function NexusUI:LoadSavedKey()
         if self:ValidateKey(savedKey) then
             self.KeySystem.CurrentKey = savedKey
             self.KeySystem.KeyValidated = true
-            print("✅ Loaded valid key from save file")
+            
         end
     end
 end
@@ -176,7 +180,6 @@ function NexusUI:GetKeysFromSite()
         
         if #keys > 0 then
             self.KeySystem.KeySettings.Key = keys
-            print("✅ Loaded " .. #keys .. " keys from site")
         end
     end
 end
@@ -185,8 +188,7 @@ function NexusUI:ValidateKey(inputKey)
     if not inputKey or type(inputKey) ~= "string" then return false end
     
     inputKey = string.upper(inputKey:gsub("%s+", ""))
-    
-    -- Check against local keys
+
     for _, validKey in ipairs(self.KeySystem.KeySettings.Key) do
         if string.upper(validKey:gsub("%s+", "")) == inputKey then
             return true
@@ -196,16 +198,13 @@ function NexusUI:ValidateKey(inputKey)
     return false
 end
 
--- Create blur effect
 function NexusUI:CreateBlurEffect()
     self.BlurEffect = Instance.new("BlurEffect")
     self.BlurEffect.Size = 0
     self.BlurEffect.Parent = game:GetService("Lighting")
 end
 
--- Create main UI container
 function NexusUI:CreateMainUI()
-    -- Remove old UI if exists
     pcall(function()
         local oldUI = CoreGui:FindFirstChild("NexusUIModern")
         if oldUI then
@@ -213,7 +212,6 @@ function NexusUI:CreateMainUI()
         end
     end)
     
-    -- Main ScreenGui
     self.ScreenGui = Instance.new("ScreenGui")
     self.ScreenGui.Name = "NexusUIModern"
     self.ScreenGui.Parent = CoreGui
@@ -221,7 +219,6 @@ function NexusUI:CreateMainUI()
     self.ScreenGui.ResetOnSpawn = false
     self.ScreenGui.Enabled = false
     
-    -- Main Window
     self.MainWindow = Instance.new("Frame")
     self.MainWindow.Name = "MainWindow"
     self.MainWindow.Size = self.Config.WindowSize
@@ -240,7 +237,6 @@ function NexusUI:CreateMainUI()
     WindowStroke.Thickness = 1
     WindowStroke.Parent = self.MainWindow
     
-    -- Top Bar
     self.TopBar = Instance.new("Frame")
     self.TopBar.Name = "TopBar"
     self.TopBar.Size = UDim2.new(1, 0, 0, 40)
@@ -284,16 +280,14 @@ function NexusUI:CreateMainUI()
     CloseIcon.ImageRectSize = Vector2.new(24, 24)
     CloseIcon.ImageColor3 = self.Colors.TextPrimary
     CloseIcon.Parent = self.CloseButton
-    
-    -- Main Content Area
+
     self.MainContent = Instance.new("Frame")
     self.MainContent.Name = "MainContent"
     self.MainContent.Size = UDim2.new(1, 0, 1, -40)
     self.MainContent.Position = UDim2.new(0, 0, 0, 40)
     self.MainContent.BackgroundTransparency = 1
     self.MainContent.Parent = self.MainWindow
-    
-    -- Sidebar Navigation
+
     self.Sidebar = Instance.new("Frame")
     self.Sidebar.Name = "Sidebar"
     self.Sidebar.Size = UDim2.new(0, 200, 1, 0)
@@ -303,8 +297,7 @@ function NexusUI:CreateMainUI()
     local SidebarCorner = Instance.new("UICorner")
     SidebarCorner.CornerRadius = UDim.new(0, 10)
     SidebarCorner.Parent = self.Sidebar
-    
-    -- Navigation List
+
     self.NavigationList = Instance.new("ScrollingFrame")
     self.NavigationList.Name = "NavigationList"
     self.NavigationList.Size = UDim2.new(1, -20, 1, -100)
@@ -319,8 +312,7 @@ function NexusUI:CreateMainUI()
     self.NavigationLayout.SortOrder = Enum.SortOrder.LayoutOrder
     self.NavigationLayout.Padding = UDim.new(0, 6)
     self.NavigationLayout.Parent = self.NavigationList
-    
-    -- Profile Section
+
     self.ProfileSection = Instance.new("Frame")
     self.ProfileSection.Name = "ProfileSection"
     self.ProfileSection.Size = UDim2.new(1, -20, 0, 80)
@@ -381,25 +373,21 @@ function NexusUI:CreateMainUI()
     self.WelcomeLabel.TextXAlignment = Enum.TextXAlignment.Left
     self.WelcomeLabel.Parent = self.ProfileSection
     
-    -- Content Pages
     self.ContentPages = Instance.new("Frame")
     self.ContentPages.Name = "ContentPages"
     self.ContentPages.Size = UDim2.new(1, -200, 1, 0)
     self.ContentPages.Position = UDim2.new(0, 200, 0, 0)
     self.ContentPages.BackgroundTransparency = 1
     self.ContentPages.Parent = self.MainContent
-    
-    -- Create Key System UI
+
     self:CreateKeySystem()
-    
-    -- Dragging variables
+   
     self.dragging = false
     self.dragInput = nil
     self.dragStart = nil
     self.startPos = nil
 end
 
--- Create Key System UI
 function NexusUI:CreateKeySystem()
     self.KeySystemUI = Instance.new("Frame")
     self.KeySystemUI.Name = "KeySystem"
@@ -418,8 +406,7 @@ function NexusUI:CreateKeySystem()
     KeySystemStroke.Color = self.Colors.SurfaceLight
     KeySystemStroke.Thickness = 1
     KeySystemStroke.Parent = self.KeySystemUI
-    
-    -- Title Section
+   
     local KeyTitle = Instance.new("TextLabel")
     KeyTitle.Name = "KeyTitle"
     KeyTitle.Size = UDim2.new(1, 0, 0, 80)
@@ -435,7 +422,6 @@ function NexusUI:CreateKeySystem()
     KeyTitleCorner.CornerRadius = UDim.new(0, 10)
     KeyTitleCorner.Parent = KeyTitle
     
-    -- Subtitle
     local KeySubtitle = Instance.new("TextLabel")
     KeySubtitle.Name = "KeySubtitle"
     KeySubtitle.Size = UDim2.new(1, -40, 0, 30)
@@ -448,7 +434,6 @@ function NexusUI:CreateKeySystem()
     KeySubtitle.TextXAlignment = Enum.TextXAlignment.Left
     KeySubtitle.Parent = self.KeySystemUI
     
-    -- Key Input
     self.KeyInput = Instance.new("TextBox")
     self.KeyInput.Name = "KeyInput"
     self.KeyInput.Size = UDim2.new(1, -40, 0, 45)
@@ -466,7 +451,6 @@ function NexusUI:CreateKeySystem()
     KeyInputCorner.CornerRadius = self.Config.CornerRadius
     KeyInputCorner.Parent = self.KeyInput
     
-    -- Submit Button
     self.KeySubmit = Instance.new("TextButton")
     self.KeySubmit.Name = "KeySubmit"
     self.KeySubmit.Size = UDim2.new(1, -40, 0, 45)
@@ -482,7 +466,6 @@ function NexusUI:CreateKeySystem()
     KeySubmitCorner.CornerRadius = self.Config.CornerRadius
     KeySubmitCorner.Parent = self.KeySubmit
     
-    -- Note Section
     local KeyNote = Instance.new("TextLabel")
     KeyNote.Name = "KeyNote"
     KeyNote.Size = UDim2.new(1, -40, 0, 60)
@@ -495,7 +478,6 @@ function NexusUI:CreateKeySystem()
     KeyNote.TextWrapped = true
     KeyNote.Parent = self.KeySystemUI
     
-    -- Message Label
     self.KeyMessage = Instance.new("TextLabel")
     self.KeyMessage.Name = "KeyMessage"
     self.KeyMessage.Size = UDim2.new(1, -40, 0, 40)
@@ -509,7 +491,6 @@ function NexusUI:CreateKeySystem()
     self.KeyMessage.Parent = self.KeySystemUI
 end
 
--- Key System Management
 function NexusUI:ShowKeySystem()
     if not self.ScreenGui then return end
     
@@ -520,7 +501,6 @@ function NexusUI:ShowKeySystem()
     TweenService:Create(self.KeySystemUI, TweenInfo.new(0.5), {BackgroundTransparency = 0}):Play()
     TweenService:Create(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount}):Play()
     
-    -- Show available keys in console for debugging
     if self.KeySystem.KeySettings.Key then
         print("=== NEXUS KEY SYSTEM ===")
         print("Доступные ключи:")
@@ -548,7 +528,6 @@ function NexusUI:OnKeySubmit()
         self.KeyMessage.Text = "✅ Ключ принят! Загрузка..."
         self.KeyMessage.TextColor3 = self.Colors.Success
         
-        -- Save key if enabled
         if self.KeySystem.KeySettings.SaveKey then
             self:SaveKeyToFile(key)
         end
@@ -568,16 +547,13 @@ function NexusUI:OnKeySubmit()
     end
 end
 
--- Setup event handlers
 function NexusUI:SetupEventHandlers()
-    -- Key system events
     if self.KeySubmit then
         self.KeySubmit.MouseButton1Click:Connect(function()
             self:OnKeySubmit()
         end)
     end
-    
-    -- Dragging events
+
     if self.TopBar then
         self.TopBar.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -605,15 +581,13 @@ function NexusUI:SetupEventHandlers()
             self:UpdateInput(input)
         end
     end)
-    
-    -- Close button
+
     if self.CloseButton then
         self.CloseButton.MouseButton1Click:Connect(function()
             self:HideMainUI()
         end)
     end
-    
-    -- Toggle UI with key
+
     self.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         
@@ -630,7 +604,6 @@ function NexusUI:SetupEventHandlers()
         end
     end)
     
-    -- Auto cleanup
     Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
         if not parent then
             self:Destroy()
@@ -638,7 +611,6 @@ function NexusUI:SetupEventHandlers()
     end)
 end
 
--- Update input for dragging
 function NexusUI:UpdateInput(input)
     if not self.MainWindow or not self.MainWindow.Parent then return end
     local delta = input.Position - self.dragStart
@@ -650,11 +622,9 @@ function NexusUI:UpdateInput(input)
     )
 end
 
--- UI visibility management
 function NexusUI:ShowMainUI()
     if not self.ScreenGui or not self.ScreenGui.Parent then return end
     
-    -- Load player avatar
     pcall(function()
         local userId = Players.LocalPlayer.UserId
         self.AvatarImage.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
@@ -663,17 +633,14 @@ function NexusUI:ShowMainUI()
     self.ScreenGui.Enabled = true
     self.MainWindow.Visible = true
     
-    -- Blur background
     self:SafeTween(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount})
     
-    -- Animate window appearance
     self.MainWindow.BackgroundTransparency = 1
     self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
         BackgroundTransparency = 0,
         Size = self.Config.WindowSize
     })
     
-    -- Select first tab if available
     if self.CurrentTab and self.Tabs[self.CurrentTab] then
         self:SelectTab(self.CurrentTab)
     elseif next(self.Tabs) then
@@ -682,20 +649,18 @@ function NexusUI:ShowMainUI()
             break
         end
     end
-    
+
     self.Enabled = true
 end
 
 function NexusUI:HideMainUI()
     if not self.ScreenGui then return end
     
-    -- Animate window disappearance
     self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
         BackgroundTransparency = 1,
         Size = UDim2.new(0, 0, 0, 0)
     })
     
-    -- Remove blur
     self:SafeTween(self.BlurEffect, TweenInfo.new(0.3), {Size = 0})
     
     wait(self.Config.AnimationDuration)
@@ -704,7 +669,6 @@ function NexusUI:HideMainUI()
     self.Enabled = false
 end
 
--- Safe tween function
 function NexusUI:SafeTween(object, tweenInfo, properties)
     if object and object.Parent then
         local tween = TweenService:Create(object, tweenInfo, properties)
@@ -1028,7 +992,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
             warn("NexusUI: Invalid button configuration")
             return nil
         end
-        return self:AddButtonToSection(content, buttonConfig)
+        return self:CreateButton(content, buttonConfig)
     end
     
     function sectionAPI.AddToggle(toggleConfig)
@@ -1036,7 +1000,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
             warn("NexusUI: Invalid toggle configuration")
             return nil
         end
-        return self:AddToggleToSection(content, toggleConfig)
+        return self:CreateToggle(content, toggleConfig)
     end
     
     function sectionAPI.AddLabel(labelConfig)
@@ -1044,7 +1008,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
             warn("NexusUI: Invalid label configuration")
             return nil
         end
-        return self:AddLabelToSection(content, labelConfig)
+        return self:CreateLabel(content, labelConfig)
     end
     
     -- Placeholder methods for future features
@@ -1281,7 +1245,6 @@ function NexusUI:CreateLabel(parent, labelConfig)
     return label
 end
 
--- Utility functions
 function NexusUI:CreateRoundedFrame(parent, size, position, backgroundColor)
     if not parent then return nil end
     local frame = Instance.new("Frame")
@@ -1297,7 +1260,6 @@ function NexusUI:CreateRoundedFrame(parent, size, position, backgroundColor)
     return frame
 end
 
--- Public API methods
 function NexusUI:SetTitle(title)
     if self.TitleLabel and type(title) == "string" then
         self.TitleLabel.Text = title
