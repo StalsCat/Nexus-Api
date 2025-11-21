@@ -1,6 +1,5 @@
--- NexusUI Library v2.1 (Ultra Stable - Fixed Edition)
+-- NexusUI Library v1.0
 -- By StalsCat, ZestyKJScripts
--- Fixed by Assistant
 
 local NexusUI = {}
 NexusUI.__index = NexusUI
@@ -70,91 +69,46 @@ local function safeGetColor(colors, colorName, fallback)
 end
 
 local function validateConfig(config, configType)
-    if config == nil then
-        return false, configType .. " configuration is nil"
-    end
-    
-    if type(config) ~= "table" then
-        return false, configType .. " configuration must be a table, got " .. type(config)
-    end
+    if config == nil then return false, configType .. " configuration is nil" end
+    if type(config) ~= "table" then return false, configType .. " configuration must be a table, got " .. type(config) end
     
     if configType == "section" then
-        if not config.Name then
-            return false, "Section name is required"
-        end
-        if type(config.Name) ~= "string" then
-            return false, "Section name must be a string, got " .. type(config.Name)
-        end
-        if config.Name == "" then
-            return false, "Section name cannot be empty"
-        end
+        if not config.Name then return false, "Section name is required" end
+        if type(config.Name) ~= "string" then return false, "Section name must be a string, got " .. type(config.Name) end
+        if config.Name == "" then return false, "Section name cannot be empty" end
         
     elseif configType == "tab" then
-        if not config.Name then
-            return false, "Tab name is required"
-        end
-        if type(config.Name) ~= "string" then
-            return false, "Tab name must be a string, got " .. type(config.Name)
-        end
-        if config.Name == "" then
-            return false, "Tab name cannot be empty"
-        end
+        if not config.Name then return false, "Tab name is required" end
+        if type(config.Name) ~= "string" then return false, "Tab name must be a string, got " .. type(config.Name) end
+        if config.Name == "" then return false, "Tab name cannot be empty" end
         
     elseif configType == "button" then
-        if not config.Name then
-            return false, "Button name is required"
-        end
-        if type(config.Name) ~= "string" then
-            return false, "Button name must be a string, got " .. type(config.Name)
-        end
-        if config.Name == "" then
-            return false, "Button name cannot be empty"
-        end
-        if config.Callback and type(config.Callback) ~= "function" then
-            return false, "Button callback must be a function"
-        end
+        if not config.Name then return false, "Button name is required" end
+        if type(config.Name) ~= "string" then return false, "Button name must be a string, got " .. type(config.Name) end
+        if config.Name == "" then return false, "Button name cannot be empty" end
+        if config.Callback and type(config.Callback) ~= "function" then return false, "Button callback must be a function" end
         
     elseif configType == "toggle" then
-        if not config.Name then
-            return false, "Toggle name is required"
-        end
-        if type(config.Name) ~= "string" then
-            return false, "Toggle name must be a string, got " .. type(config.Name)
-        end
-        if config.Name == "" then
-            return false, "Toggle name cannot be empty"
-        end
-        if config.Callback and type(config.Callback) ~= "function" then
-            return false, "Toggle callback must be a function"
-        end
+        if not config.Name then return false, "Toggle name is required" end
+        if type(config.Name) ~= "string" then return false, "Toggle name must be a string, got " .. type(config.Name) end
+        if config.Name == "" then return false, "Toggle name cannot be empty" end
+        if config.Callback and type(config.Callback) ~= "function" then return false, "Toggle callback must be a function" end
         
     elseif configType == "label" then
-        if not config.Text then
-            return false, "Label text is required"
-        end
-        if type(config.Text) ~= "string" then
-            return false, "Label text must be a string, got " .. type(config.Text)
-        end
-        if config.Text == "" then
-            return false, "Label text cannot be empty"
-        end
+        if not config.Text then return false, "Label text is required" end
+        if type(config.Text) ~= "string" then return false, "Label text must be a string, got " .. type(config.Text) end
+        if config.Text == "" then return false, "Label text cannot be empty" end
     end
     
     return true
 end
 
 local function stringToKeyCode(keyString)
-    if keyString == nil then
-        return Enum.KeyCode.Insert
-    end
+    if keyString == nil then return Enum.KeyCode.Insert end
     
     if type(keyString) == "string" then
-        local success, keyCode = pcall(function()
-            return Enum.KeyCode[keyString]
-        end)
-        if success and keyCode then
-            return keyCode
-        end
+        local success, keyCode = pcall(function() return Enum.KeyCode[keyString] end)
+        if success and keyCode then return keyCode end
     end
     
     if typeof(keyString) == "EnumItem" and keyString.EnumType == Enum.KeyCode then
@@ -169,32 +123,20 @@ local function safeCreateInstance(className, properties)
         local inst = Instance.new(className)
         if properties then
             for property, value in pairs(properties) do
-                pcall(function()
-                    inst[property] = value
-                end)
+                pcall(function() inst[property] = value end)
             end
         end
         return inst
     end)
     
-    if success then
-        return instance
-    else
-        warn("NexusUI: Failed to create instance of type " .. className .. ": " .. tostring(instance))
-        return nil
-    end
+    if success then return instance end
+    warn("NexusUI: Failed to create instance of type " .. className)
+    return nil
 end
 
 -- Main constructor
 function NexusUI.new(config)
     config = config or {}
-    
-    local toggleKey = stringToKeyCode(config.ToggleKey)
-    
-    local keySystemConfig = config.KeySystem or {Enabled = false}
-    local keySettings = keySystemConfig.KeySettings or {}
-    
-    local mergedColors = deepMerge(NexusUI.DefaultColors, config.Colors or {})
     
     local self = setmetatable({
         Config = {
@@ -202,20 +144,20 @@ function NexusUI.new(config)
             CornerRadius = typeof(config.CornerRadius) == "UDim" and config.CornerRadius or NexusUI.DefaultConfig.CornerRadius,
             AnimationDuration = type(config.AnimationDuration) == "number" and math.max(0.1, config.AnimationDuration) or NexusUI.DefaultConfig.AnimationDuration,
             BlurAmount = type(config.BlurAmount) == "number" and math.max(0, config.BlurAmount) or NexusUI.DefaultConfig.BlurAmount,
-            ToggleKey = toggleKey
+            ToggleKey = stringToKeyCode(config.ToggleKey)
         },
-        Colors = mergedColors,
+        Colors = deepMerge(NexusUI.DefaultColors, config.Colors or {}),
         KeySystem = {
-            Enabled = type(keySystemConfig.Enabled) == "boolean" and keySystemConfig.Enabled or false,
+            Enabled = config.KeySystem and type(config.KeySystem.Enabled) == "boolean" and config.KeySystem.Enabled or false,
             KeySettings = {
-                Title = type(keySettings.Title) == "string" and keySettings.Title or "Key System",
-                Subtitle = type(keySettings.Subtitle) == "string" and keySettings.Subtitle or "Enter your key",
-                Note = type(keySettings.Note) == "string" and keySettings.Note or "No method of obtaining the key is provided",
-                FileName = type(keySettings.FileName) == "string" and keySettings.FileName or "Key",
-                SaveKey = type(keySettings.SaveKey) == "boolean" and keySettings.SaveKey or false,
-                GrabKeyFromSite = type(keySettings.GrabKeyFromSite) == "boolean" and keySettings.GrabKeyFromSite or false,
-                Key = type(keySettings.Key) == "table" and keySettings.Key or {"DemoKey-1234-5678-9012"},
-                KeysFromSite = keySettings.KeysFromSite
+                Title = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.Title) == "string" and config.KeySystem.KeySettings.Title or "Key System",
+                Subtitle = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.Subtitle) == "string" and config.KeySystem.KeySettings.Subtitle or "Enter your key",
+                Note = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.Note) == "string" and config.KeySystem.KeySettings.Note or "No method of obtaining the key is provided",
+                FileName = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.FileName) == "string" and config.KeySystem.KeySettings.FileName or "Key",
+                SaveKey = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.SaveKey) == "boolean" and config.KeySystem.KeySettings.SaveKey or false,
+                GrabKeyFromSite = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.GrabKeyFromSite) == "boolean" and config.KeySystem.KeySettings.GrabKeyFromSite or false,
+                Key = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.Key) == "table" and config.KeySystem.KeySettings.Key or {"DemoKey-1234-5678-9012"},
+                KeysFromSite = config.KeySystem and config.KeySystem.KeySettings and config.KeySystem.KeySettings.KeysFromSite
             },
             CurrentKey = nil,
             KeyValidated = false
@@ -229,9 +171,7 @@ function NexusUI.new(config)
         Initialized = false
     }, NexusUI)
     
-    local success, err = pcall(function()
-        self:Initialize()
-    end)
+    local success, err = pcall(function() self:Initialize() end)
     
     if not success then
         warn("NexusUI: Initialization failed: " .. tostring(err))
@@ -245,7 +185,7 @@ end
 
 -- Key System Implementation
 function NexusUI:LoadSavedKey()
-    if not self.KeySystem.KeySettings.SaveKey then return end
+    if not self.KeySystem.KeySettings.SaveKey then return false end
     
     local success, savedKey = pcall(function()
         if readfile and type(readfile) == "function" then
@@ -282,56 +222,12 @@ function NexusUI:SaveKeyToFile(key)
     return success
 end
 
-function NexusUI:GetKeysFromSite()
-    if not self.KeySystem.KeySettings.GrabKeyFromSite then return end
-    
-    local siteUrl = self.KeySystem.KeySettings.KeysFromSite
-    if not siteUrl or type(siteUrl) ~= "string" then return end
-    
-    local success, keysData = pcall(function()
-        if syn and syn.request then
-            local response = syn.request({
-                Url = siteUrl,
-                Method = "GET",
-                Timeout = 10
-            })
-            if response.Success then
-                return response.Body
-            end
-        elseif request then
-            local response = request({
-                Url = siteUrl,
-                Method = "GET"
-            })
-            if response.Success then
-                return response.Body
-            end
-        end
-        return nil
-    end)
-    
-    if success and keysData and type(keysData) == "string" then
-        local keys = {}
-        for key in string.gmatch(keysData, "[^\r\n]+") do
-            if key and key ~= "" and type(key) == "string" then
-                table.insert(keys, key)
-            end
-        end
-        
-        if #keys > 0 then
-            self.KeySystem.KeySettings.Key = keys
-            return true
-        end
-    end
-    return false
-end
-
 function NexusUI:ValidateKey(inputKey)
     if not inputKey or type(inputKey) ~= "string" then return false end
     
     inputKey = string.upper(inputKey:gsub("%s+", ""))
-
     local validKeys = self.KeySystem.KeySettings.Key
+    
     if not validKeys or type(validKeys) ~= "table" then return false end
 
     for _, validKey in ipairs(validKeys) do
@@ -387,409 +283,349 @@ end
 function NexusUI:CreateMainUI()
     if self.Destroyed then return end
     
-    local success, err = pcall(function()
-        pcall(function()
-            local oldUI = CoreGui:FindFirstChild("NexusUIModern")
-            if oldUI then
-                oldUI:Destroy()
-            end
-        end)
-        
-        self.ScreenGui = safeCreateInstance("ScreenGui", {
-            Name = "NexusUIModern",
-            Parent = CoreGui,
-            ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-            ResetOnSpawn = false,
-            Enabled = false
-        })
-        
-        if not self.ScreenGui then
-            error("Failed to create ScreenGui")
-        end
-        
-        self.MainWindow = safeCreateInstance("Frame", {
-            Name = "MainWindow",
-            Size = self.Config.WindowSize,
-            Position = UDim2.new(0.5, -self.Config.WindowSize.X.Offset/2, 0.5, -self.Config.WindowSize.Y.Offset/2),
-            BackgroundColor3 = safeGetColor(self.Colors, "Background"),
-            BackgroundTransparency = 1,
-            Visible = false,
-            Parent = self.ScreenGui
-        })
-        
-        if not self.MainWindow then
-            error("Failed to create MainWindow")
-        end
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = self.Config.CornerRadius,
-            Parent = self.MainWindow
-        })
-        
-        safeCreateInstance("UIStroke", {
-            Color = safeGetColor(self.Colors, "SurfaceLight"),
-            Thickness = 1,
-            Parent = self.MainWindow
-        })
-        
-        self.TopBar = safeCreateInstance("Frame", {
-            Name = "TopBar",
-            Size = UDim2.new(1, 0, 0, 40),
-            BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
-            Parent = self.MainWindow
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = UDim.new(0, 10),
-            Parent = self.TopBar
-        })
-        
-        self.TitleLabel = safeCreateInstance("TextLabel", {
-            Name = "TitleLabel",
-            Size = UDim2.new(0.5, 0, 1, 0),
-            Position = UDim2.new(0, 15, 0, 0),
-            BackgroundTransparency = 1,
-            Text = "NEXUS UI",
-            TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
-            TextSize = 16,
-            Font = Enum.Font.GothamBold,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = self.TopBar
-        })
-        
-        self.CloseButton = safeCreateInstance("ImageButton", {
-            Name = "CloseButton",
-            Size = UDim2.new(0, 25, 0, 25),
-            Position = UDim2.new(1, -35, 0.5, -12.5),
-            BackgroundColor3 = safeGetColor(self.Colors, "Error"),
-            Parent = self.TopBar
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = UDim.new(1, 0),
-            Parent = self.CloseButton
-        })
-        
-        safeCreateInstance("ImageLabel", {
-            Name = "CloseIcon",
-            Size = UDim2.new(0.5, 0, 0.5, 0),
-            Position = UDim2.new(0.25, 0, 0.25, 0),
-            BackgroundTransparency = 1,
-            Image = "rbxassetid://3926305904",
-            ImageRectOffset = Vector2.new(284, 4),
-            ImageRectSize = Vector2.new(24, 24),
-            ImageColor3 = safeGetColor(self.Colors, "TextPrimary"),
-            Parent = self.CloseButton
-        })
-
-        self.MainContent = safeCreateInstance("Frame", {
-            Name = "MainContent",
-            Size = UDim2.new(1, 0, 1, -40),
-            Position = UDim2.new(0, 0, 0, 40),
-            BackgroundTransparency = 1,
-            Parent = self.MainWindow
-        })
-
-        self.Sidebar = safeCreateInstance("Frame", {
-            Name = "Sidebar",
-            Size = UDim2.new(0, 200, 1, 0),
-            BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
-            Parent = self.MainContent
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = UDim.new(0, 10),
-            Parent = self.Sidebar
-        })
-
-        self.NavigationList = safeCreateInstance("ScrollingFrame", {
-            Name = "NavigationList",
-            Size = UDim2.new(1, -20, 1, -100),
-            Position = UDim2.new(0, 10, 0, 10),
-            BackgroundTransparency = 1,
-            ScrollBarThickness = 4,
-            ScrollBarImageColor3 = safeGetColor(self.Colors, "SurfaceLight"),
-            CanvasSize = UDim2.new(0, 0, 0, 0),
-            Parent = self.Sidebar
-        })
-        
-        self.NavigationLayout = safeCreateInstance("UIListLayout", {
-            SortOrder = Enum.SortOrder.LayoutOrder,
-            Padding = UDim.new(0, 6),
-            Parent = self.NavigationList
-        })
-
-        self.ProfileSection = safeCreateInstance("Frame", {
-            Name = "ProfileSection",
-            Size = UDim2.new(1, -20, 0, 80),
-            Position = UDim2.new(0, 10, 1, -90),
-            BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight"),
-            Parent = self.Sidebar
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = self.Config.CornerRadius,
-            Parent = self.ProfileSection
-        })
-        
-        local AvatarFrame = safeCreateInstance("Frame", {
-            Name = "AvatarFrame",
-            Size = UDim2.new(0, 50, 0, 50),
-            Position = UDim2.new(0, 10, 0.5, -25),
-            BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
-            Parent = self.ProfileSection
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = UDim.new(1, 0),
-            Parent = AvatarFrame
-        })
-        
-        safeCreateInstance("UIStroke", {
-            Color = safeGetColor(self.Colors, "Primary"),
-            Thickness = 2,
-            Parent = AvatarFrame
-        })
-        
-        self.AvatarImage = safeCreateInstance("ImageLabel", {
-            Name = "AvatarImage",
-            Size = UDim2.new(0.8, 0, 0.8, 0),
-            Position = UDim2.new(0.1, 0, 0.1, 0),
-            BackgroundTransparency = 1,
-            Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
-            Parent = AvatarFrame
-        })
-        
-        self.UsernameLabel = safeCreateInstance("TextLabel", {
-            Name = "UsernameLabel",
-            Size = UDim2.new(1, -70, 0, 20),
-            Position = UDim2.new(0, 65, 0, 20),
-            BackgroundTransparency = 1,
-            Text = Players.LocalPlayer and Players.LocalPlayer.Name or "Player",
-            TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
-            TextSize = 14,
-            Font = Enum.Font.GothamBold,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextTruncate = Enum.TextTruncate.AtEnd,
-            Parent = self.ProfileSection
-        })
-        
-        self.WelcomeLabel = safeCreateInstance("TextLabel", {
-            Name = "WelcomeLabel",
-            Size = UDim2.new(1, -70, 0, 16),
-            Position = UDim2.new(0, 65, 0, 42),
-            BackgroundTransparency = 1,
-            Text = "Добро пожаловать!",
-            TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
-            TextSize = 12,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = self.ProfileSection
-        })
-        
-        self.ContentPages = safeCreateInstance("Frame", {
-            Name = "ContentPages",
-            Size = UDim2.new(1, -200, 1, 0),
-            Position = UDim2.new(0, 200, 0, 0),
-            BackgroundTransparency = 1,
-            Parent = self.MainContent
-        })
-
-        self:CreateKeySystem()
-        
-        self.dragging = false
-        self.dragInput = nil
-        self.dragStart = nil
-        self.startPos = nil
+    -- Clean up old UI
+    pcall(function()
+        local oldUI = CoreGui:FindFirstChild("NexusUIModern")
+        if oldUI then oldUI:Destroy() end
     end)
     
-    if not success then
-        warn("NexusUI: Main UI creation failed: " .. tostring(err))
-        self.Destroyed = true
-    end
+    -- Create ScreenGui
+    self.ScreenGui = safeCreateInstance("ScreenGui", {
+        Name = "NexusUIModern",
+        Parent = CoreGui,
+        ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+        ResetOnSpawn = false,
+        Enabled = false
+    })
+    
+    if not self.ScreenGui then error("Failed to create ScreenGui") end
+    
+    -- Create Main Window
+    self.MainWindow = safeCreateInstance("Frame", {
+        Name = "MainWindow",
+        Size = self.Config.WindowSize,
+        Position = UDim2.new(0.5, -self.Config.WindowSize.X.Offset/2, 0.5, -self.Config.WindowSize.Y.Offset/2),
+        BackgroundColor3 = safeGetColor(self.Colors, "Background"),
+        BackgroundTransparency = 1,
+        Visible = false,
+        Parent = self.ScreenGui
+    })
+    
+    if not self.MainWindow then error("Failed to create MainWindow") end
+    
+    safeCreateInstance("UICorner", {CornerRadius = self.Config.CornerRadius, Parent = self.MainWindow})
+    safeCreateInstance("UIStroke", {Color = safeGetColor(self.Colors, "SurfaceLight"), Thickness = 1, Parent = self.MainWindow})
+    
+    -- Top Bar
+    self.TopBar = safeCreateInstance("Frame", {
+        Name = "TopBar",
+        Size = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
+        Parent = self.MainWindow
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 10), Parent = self.TopBar})
+    
+    self.TitleLabel = safeCreateInstance("TextLabel", {
+        Name = "TitleLabel",
+        Size = UDim2.new(0.5, 0, 1, 0),
+        Position = UDim2.new(0, 15, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "NEXUS UI",
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        TextSize = 16,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.TopBar
+    })
+    
+    self.CloseButton = safeCreateInstance("ImageButton", {
+        Name = "CloseButton",
+        Size = UDim2.new(0, 25, 0, 25),
+        Position = UDim2.new(1, -35, 0.5, -12.5),
+        BackgroundColor3 = safeGetColor(self.Colors, "Error"),
+        Parent = self.TopBar
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(1, 0), Parent = self.CloseButton})
+    
+    safeCreateInstance("ImageLabel", {
+        Name = "CloseIcon",
+        Size = UDim2.new(0.5, 0, 0.5, 0),
+        Position = UDim2.new(0.25, 0, 0.25, 0),
+        BackgroundTransparency = 1,
+        Image = "rbxassetid://3926305904",
+        ImageRectOffset = Vector2.new(284, 4),
+        ImageRectSize = Vector2.new(24, 24),
+        ImageColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        Parent = self.CloseButton
+    })
+
+    -- Main Content
+    self.MainContent = safeCreateInstance("Frame", {
+        Name = "MainContent",
+        Size = UDim2.new(1, 0, 1, -40),
+        Position = UDim2.new(0, 0, 0, 40),
+        BackgroundTransparency = 1,
+        Parent = self.MainWindow
+    })
+
+    -- Sidebar
+    self.Sidebar = safeCreateInstance("Frame", {
+        Name = "Sidebar",
+        Size = UDim2.new(0, 200, 1, 0),
+        BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
+        Parent = self.MainContent
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 10), Parent = self.Sidebar})
+
+    -- Navigation
+    self.NavigationList = safeCreateInstance("ScrollingFrame", {
+        Name = "NavigationList",
+        Size = UDim2.new(1, -20, 1, -100),
+        Position = UDim2.new(0, 10, 0, 10),
+        BackgroundTransparency = 1,
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = safeGetColor(self.Colors, "SurfaceLight"),
+        CanvasSize = UDim2.new(0, 0, 0, 0),
+        Parent = self.Sidebar
+    })
+    
+    self.NavigationLayout = safeCreateInstance("UIListLayout", {
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 6),
+        Parent = self.NavigationList
+    })
+
+    -- Profile Section
+    self.ProfileSection = safeCreateInstance("Frame", {
+        Name = "ProfileSection",
+        Size = UDim2.new(1, -20, 0, 80),
+        Position = UDim2.new(0, 10, 1, -90),
+        BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight"),
+        Parent = self.Sidebar
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = self.Config.CornerRadius, Parent = self.ProfileSection})
+    
+    local AvatarFrame = safeCreateInstance("Frame", {
+        Name = "AvatarFrame",
+        Size = UDim2.new(0, 50, 0, 50),
+        Position = UDim2.new(0, 10, 0.5, -25),
+        BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
+        Parent = self.ProfileSection
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(1, 0), Parent = AvatarFrame})
+    safeCreateInstance("UIStroke", {Color = safeGetColor(self.Colors, "Primary"), Thickness = 2, Parent = AvatarFrame})
+    
+    self.AvatarImage = safeCreateInstance("ImageLabel", {
+        Name = "AvatarImage",
+        Size = UDim2.new(0.8, 0, 0.8, 0),
+        Position = UDim2.new(0.1, 0, 0.1, 0),
+        BackgroundTransparency = 1,
+        Image = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+        Parent = AvatarFrame
+    })
+    
+    self.UsernameLabel = safeCreateInstance("TextLabel", {
+        Name = "UsernameLabel",
+        Size = UDim2.new(1, -70, 0, 20),
+        Position = UDim2.new(0, 65, 0, 20),
+        BackgroundTransparency = 1,
+        Text = Players.LocalPlayer and Players.LocalPlayer.Name or "Player",
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        TextSize = 14,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        Parent = self.ProfileSection
+    })
+    
+    self.WelcomeLabel = safeCreateInstance("TextLabel", {
+        Name = "WelcomeLabel",
+        Size = UDim2.new(1, -70, 0, 16),
+        Position = UDim2.new(0, 65, 0, 42),
+        BackgroundTransparency = 1,
+        Text = "Добро пожаловать!",
+        TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.ProfileSection
+    })
+    
+    -- Content Pages
+    self.ContentPages = safeCreateInstance("Frame", {
+        Name = "ContentPages",
+        Size = UDim2.new(1, -200, 1, 0),
+        Position = UDim2.new(0, 200, 0, 0),
+        BackgroundTransparency = 1,
+        Parent = self.MainContent
+    })
+
+    -- Key System UI
+    self:CreateKeySystem()
+    
+    -- Drag system
+    self.dragging = false
+    self.dragInput = nil
+    self.dragStart = nil
+    self.startPos = nil
 end
 
 function NexusUI:CreateKeySystem()
-    if self.Destroyed or not self.Colors then return end
+    if self.Destroyed then return end
     
-    local success, err = pcall(function()
-        self.KeySystemUI = safeCreateInstance("Frame", {
-            Name = "KeySystem",
-            Size = UDim2.new(0, 450, 0, 400),
-            Position = UDim2.new(0.5, -225, 0.5, -200),
-            BackgroundColor3 = safeGetColor(self.Colors, "Background"),
-            BackgroundTransparency = 1,
-            Visible = false,
-            Parent = self.ScreenGui
-        })
-        
-        if not self.KeySystemUI then return end
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = self.Config.CornerRadius,
-            Parent = self.KeySystemUI
-        })
-        
-        safeCreateInstance("UIStroke", {
-            Color = safeGetColor(self.Colors, "SurfaceLight"),
-            Thickness = 1,
-            Parent = self.KeySystemUI
-        })
-        
-        local KeyTitle = safeCreateInstance("TextLabel", {
-            Name = "KeyTitle",
-            Size = UDim2.new(1, 0, 0, 80),
-            Position = UDim2.new(0, 0, 0, 0),
-            BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
-            Text = self.KeySystem.KeySettings.Title,
-            TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
-            TextSize = 24,
-            Font = Enum.Font.GothamBold,
-            Parent = self.KeySystemUI
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = UDim.new(0, 10),
-            Parent = KeyTitle
-        })
-        
-        local KeySubtitle = safeCreateInstance("TextLabel", {
-            Name = "KeySubtitle",
-            Size = UDim2.new(1, -40, 0, 30),
-            Position = UDim2.new(0, 20, 0, 90),
-            BackgroundTransparency = 1,
-            Text = self.KeySystem.KeySettings.Subtitle,
-            TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
-            TextSize = 16,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = self.KeySystemUI
-        })
-        
-        self.KeyInput = safeCreateInstance("TextBox", {
-            Name = "KeyInput",
-            Size = UDim2.new(1, -40, 0, 45),
-            Position = UDim2.new(0, 20, 0, 130),
-            BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
-            TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
-            Text = "",
-            PlaceholderText = "Введите ключ...",
-            PlaceholderColor3 = safeGetColor(self.Colors, "TextSecondary"),
-            TextSize = 14,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = self.KeySystemUI
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = UDim.new(0, 8),
-            Parent = self.KeyInput
-        })
-        
-        safeCreateInstance("UIStroke", {
-            Color = safeGetColor(self.Colors, "SurfaceLight"),
-            Thickness = 1,
-            Parent = self.KeyInput
-        })
-        
-        self.KeySubmit = safeCreateInstance("TextButton", {
-            Name = "KeySubmit",
-            Size = UDim2.new(1, -40, 0, 45),
-            Position = UDim2.new(0, 20, 0, 190),
-            BackgroundColor3 = safeGetColor(self.Colors, "Primary"),
-            TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
-            Text = "ПРОВЕРИТЬ КЛЮЧ",
-            TextSize = 16,
-            Font = Enum.Font.GothamBold,
-            Parent = self.KeySystemUI
-        })
-        
-        safeCreateInstance("UICorner", {
-            CornerRadius = UDim.new(0, 8),
-            Parent = self.KeySubmit
-        })
-        
-        local KeyNote = safeCreateInstance("TextLabel", {
-            Name = "KeyNote",
-            Size = UDim2.new(1, -40, 0, 40),
-            Position = UDim2.new(0, 20, 1, -50),
-            BackgroundTransparency = 1,
-            Text = self.KeySystem.KeySettings.Note,
-            TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
-            TextSize = 12,
-            Font = Enum.Font.Gotham,
-            TextWrapped = true,
-            Parent = self.KeySystemUI
-        })
-        
-        self.KeyStatus = safeCreateInstance("TextLabel", {
-            Name = "KeyStatus",
-            Size = UDim2.new(1, -40, 0, 20),
-            Position = UDim2.new(0, 20, 0, 245),
-            BackgroundTransparency = 1,
-            Text = "",
-            TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
-            TextSize = 12,
-            Font = Enum.Font.Gotham,
-            TextXAlignment = Enum.TextXAlignment.Left,
-            Parent = self.KeySystemUI
-        })
-    end)
+    self.KeySystemUI = safeCreateInstance("Frame", {
+        Name = "KeySystem",
+        Size = UDim2.new(0, 450, 0, 400),
+        Position = UDim2.new(0.5, -225, 0.5, -200),
+        BackgroundColor3 = safeGetColor(self.Colors, "Background"),
+        BackgroundTransparency = 1,
+        Visible = false,
+        Parent = self.ScreenGui
+    })
     
-    if not success then
-        warn("NexusUI: Key system creation failed: " .. tostring(err))
-    end
+    if not self.KeySystemUI then return end
+    
+    safeCreateInstance("UICorner", {CornerRadius = self.Config.CornerRadius, Parent = self.KeySystemUI})
+    safeCreateInstance("UIStroke", {Color = safeGetColor(self.Colors, "SurfaceLight"), Thickness = 1, Parent = self.KeySystemUI})
+    
+    local KeyTitle = safeCreateInstance("TextLabel", {
+        Name = "KeyTitle",
+        Size = UDim2.new(1, 0, 0, 80),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
+        Text = self.KeySystem.KeySettings.Title,
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        TextSize = 24,
+        Font = Enum.Font.GothamBold,
+        Parent = self.KeySystemUI
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 10), Parent = KeyTitle})
+    
+    local KeySubtitle = safeCreateInstance("TextLabel", {
+        Name = "KeySubtitle",
+        Size = UDim2.new(1, -40, 0, 30),
+        Position = UDim2.new(0, 20, 0, 90),
+        BackgroundTransparency = 1,
+        Text = self.KeySystem.KeySettings.Subtitle,
+        TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+        TextSize = 16,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.KeySystemUI
+    })
+    
+    self.KeyInput = safeCreateInstance("TextBox", {
+        Name = "KeyInput",
+        Size = UDim2.new(1, -40, 0, 45),
+        Position = UDim2.new(0, 20, 0, 130),
+        BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        Text = "",
+        PlaceholderText = "Введите ключ...",
+        PlaceholderColor3 = safeGetColor(self.Colors, "TextSecondary"),
+        TextSize = 14,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.KeySystemUI
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 8), Parent = self.KeyInput})
+    safeCreateInstance("UIStroke", {Color = safeGetColor(self.Colors, "SurfaceLight"), Thickness = 1, Parent = self.KeyInput})
+    
+    self.KeySubmit = safeCreateInstance("TextButton", {
+        Name = "KeySubmit",
+        Size = UDim2.new(1, -40, 0, 45),
+        Position = UDim2.new(0, 20, 0, 190),
+        BackgroundColor3 = safeGetColor(self.Colors, "Primary"),
+        TextColor3 = safeGetColor(self.Colors, "TextPrimary"),
+        Text = "ПРОВЕРИТЬ КЛЮЧ",
+        TextSize = 16,
+        Font = Enum.Font.GothamBold,
+        Parent = self.KeySystemUI
+    })
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 8), Parent = self.KeySubmit})
+    
+    local KeyNote = safeCreateInstance("TextLabel", {
+        Name = "KeyNote",
+        Size = UDim2.new(1, -40, 0, 40),
+        Position = UDim2.new(0, 20, 1, -50),
+        BackgroundTransparency = 1,
+        Text = self.KeySystem.KeySettings.Note,
+        TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        TextWrapped = true,
+        Parent = self.KeySystemUI
+    })
+    
+    self.KeyStatus = safeCreateInstance("TextLabel", {
+        Name = "KeyStatus",
+        Size = UDim2.new(1, -40, 0, 20),
+        Position = UDim2.new(0, 20, 0, 245),
+        BackgroundTransparency = 1,
+        Text = "",
+        TextColor3 = safeGetColor(self.Colors, "TextSecondary"),
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = self.KeySystemUI
+    })
 end
 
 function NexusUI:SetupEventHandlers()
     if self.Destroyed then return end
     
-    local function safeConnectEvent(object, event, callback)
-        if object and object.Parent then
-            pcall(function()
-                object[event]:Connect(callback)
-            end)
-        end
+    -- Key system events
+    if self.KeySubmit then
+        self.KeySubmit.MouseButton1Click:Connect(function() self:OnKeySubmit() end)
     end
     
-    safeConnectEvent(self.KeySubmit, "MouseButton1Click", function()
-        self:OnKeySubmit()
-    end)
+    if self.KeyInput then
+        self.KeyInput.FocusLost:Connect(function(enterPressed)
+            if enterPressed then self:OnKeySubmit() end
+        end)
+    end
     
-    safeConnectEvent(self.KeyInput, "FocusLost", function(enterPressed)
-        if enterPressed then
-            self:OnKeySubmit()
-        end
-    end)
+    -- Drag events
+    if self.TopBar then
+        self.TopBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                self.dragging = true
+                self.dragStart = input.Position
+                self.startPos = self.MainWindow.Position
+                
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        self.dragging = false
+                    end
+                end)
+            end
+        end)
+        
+        self.TopBar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and self.dragging then
+                local delta = input.Position - self.dragStart
+                self.MainWindow.Position = UDim2.new(
+                    self.startPos.X.Scale, self.startPos.X.Offset + delta.X,
+                    self.startPos.Y.Scale, self.startPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+    end
     
-    safeConnectEvent(self.TopBar, "InputBegan", function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            self.dragging = true
-            self.dragStart = input.Position
-            self.startPos = self.MainWindow.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    self.dragging = false
-                end
-            end)
-        end
-    end)
+    -- Close button
+    if self.CloseButton then
+        self.CloseButton.MouseButton1Click:Connect(function() self:HideMainUI() end)
+    end
     
-    safeConnectEvent(self.TopBar, "InputChanged", function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement and self.dragging then
-            local delta = input.Position - self.dragStart
-            self.MainWindow.Position = UDim2.new(
-                self.startPos.X.Scale, self.startPos.X.Offset + delta.X,
-                self.startPos.Y.Scale, self.startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-    
-    safeConnectEvent(self.CloseButton, "MouseButton1Click", function()
-        self:HideMainUI()
-    end)
-    
+    -- Input handling
     self.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         
@@ -806,11 +642,10 @@ function NexusUI:SetupEventHandlers()
         end
     end)
     
+    -- Player cleanup
     if Players.LocalPlayer then
         Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
-            if not parent then
-                self:Destroy()
-            end
+            if not parent then self:Destroy() end
         end)
     end
 end
@@ -829,21 +664,15 @@ function NexusUI:SafeTween(object, tweenInfo, properties)
             end
         end
         
-        if next(validProperties) == nil then
-            return nil
-        end
+        if next(validProperties) == nil then return nil end
         
         local tween = TweenService:Create(object, tweenInfo, validProperties)
         tween:Play()
         return tween
     end)
     
-    if success then
-        return tween
-    else
-        warn("NexusUI: Tween creation failed for " .. tostring(object))
-        return nil
-    end
+    if success then return tween end
+    return nil
 end
 
 -- Tab Management
@@ -934,16 +763,8 @@ function NexusUI:CreateNavButton(navConfig)
     
     if not button then return nil end
     
-    safeCreateInstance("UICorner", {
-        CornerRadius = UDim.new(0, 8),
-        Parent = button
-    })
-    
-    safeCreateInstance("UIStroke", {
-        Color = safeGetColor(self.Colors, "Primary"),
-        Thickness = 1,
-        Parent = button
-    })
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 8), Parent = button})
+    safeCreateInstance("UIStroke", {Color = safeGetColor(self.Colors, "Primary"), Thickness = 1, Parent = button})
     
     local buttonText = safeCreateInstance("TextLabel", {
         Name = "ButtonText",
@@ -1011,7 +832,9 @@ function NexusUI:SelectTab(tabName)
     if not self.Tabs[tabName] then return end
     
     for name, tab in pairs(self.Tabs) do
-        tab.Page.Visible = (name == tabName)
+        if tab.Page then
+            tab.Page.Visible = (name == tabName)
+        end
         if tab.Button then
             local targetColor = name == tabName and safeGetColor(self.Colors, "Primary") or safeGetColor(self.Colors, "SurfaceLight")
             self:SafeTween(tab.Button, TweenInfo.new(0.2), {
@@ -1048,16 +871,10 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = tab.Page
     })
     
-    safeCreateInstance("UICorner", {
-        CornerRadius = self.Config.CornerRadius,
-        Parent = section
-    })
+    if not section then return nil end
     
-    safeCreateInstance("UIStroke", {
-        Color = safeGetColor(self.Colors, "SurfaceLight"),
-        Thickness = 1,
-        Parent = section
-    })
+    safeCreateInstance("UICorner", {CornerRadius = self.Config.CornerRadius, Parent = section})
+    safeCreateInstance("UIStroke", {Color = safeGetColor(self.Colors, "SurfaceLight"), Thickness = 1, Parent = section})
     
     safeCreateInstance("TextLabel", {
         Name = "Title",
@@ -1080,6 +897,8 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         Parent = section
     })
     
+    if not content then return nil end
+    
     local contentLayout = safeCreateInstance("UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder,
         Padding = UDim.new(0, 8),
@@ -1087,8 +906,10 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     })
     
     contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
-        section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
+        if content and content.Parent then
+            content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
+            section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
+        end
     end)
     
     table.insert(tab.Elements, {
@@ -1125,6 +946,8 @@ end
 
 -- Element Creation
 function NexusUI:CreateButton(parent, buttonConfig)
+    if not parent then return nil end
+    
     local button = safeCreateInstance("TextButton", {
         Name = buttonConfig.Name .. "Button",
         Size = UDim2.new(1, 0, 0, 35),
@@ -1133,10 +956,9 @@ function NexusUI:CreateButton(parent, buttonConfig)
         Parent = parent
     })
     
-    safeCreateInstance("UICorner", {
-        CornerRadius = UDim.new(0, 6),
-        Parent = button
-    })
+    if not button then return nil end
+    
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 6), Parent = button})
     
     local buttonText = safeCreateInstance("TextLabel", {
         Name = "ButtonText",
@@ -1171,12 +993,16 @@ function NexusUI:CreateButton(parent, buttonConfig)
 end
 
 function NexusUI:CreateToggle(parent, toggleConfig)
+    if not parent then return nil end
+    
     local toggleFrame = safeCreateInstance("Frame", {
         Name = toggleConfig.Name .. "Toggle",
         Size = UDim2.new(1, 0, 0, 35),
         BackgroundTransparency = 1,
         Parent = parent
     })
+    
+    if not toggleFrame then return nil end
     
     local toggleButton = safeCreateInstance("TextButton", {
         Name = "ToggleButton",
@@ -1187,10 +1013,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
         Parent = toggleFrame
     })
     
-    safeCreateInstance("UICorner", {
-        CornerRadius = UDim.new(0, 6),
-        Parent = toggleButton
-    })
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(0, 6), Parent = toggleButton})
     
     local toggleIndicator = safeCreateInstance("Frame", {
         Name = "ToggleIndicator",
@@ -1200,10 +1023,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
         Parent = toggleButton
     })
     
-    safeCreateInstance("UICorner", {
-        CornerRadius = UDim.new(1, 0),
-        Parent = toggleIndicator
-    })
+    safeCreateInstance("UICorner", {CornerRadius = UDim.new(1, 0), Parent = toggleIndicator})
     
     local toggleLabel = safeCreateInstance("TextLabel", {
         Name = "ToggleLabel",
@@ -1253,13 +1073,13 @@ function NexusUI:CreateToggle(parent, toggleConfig)
                 })
             end
         end,
-        GetState = function()
-            return state
-        end
+        GetState = function() return state end
     }
 end
 
 function NexusUI:CreateLabel(parent, labelConfig)
+    if not parent then return nil end
+    
     local label = safeCreateInstance("TextLabel", {
         Name = "Label",
         Size = UDim2.new(1, 0, 0, 25),
@@ -1302,10 +1122,6 @@ function NexusUI:ShowKeySystem()
     self:SafeTween(self.KeySystemUI, TweenInfo.new(self.Config.AnimationDuration), {
         BackgroundTransparency = 0
     })
-    
-    if self.KeySystem.KeySettings.GrabKeyFromSite then
-        self:GetKeysFromSite()
-    end
 end
 
 function NexusUI:HideKeySystem()
@@ -1328,16 +1144,21 @@ function NexusUI:OnKeySubmit()
     
     local inputKey = self.KeyInput.Text
     if not inputKey or inputKey == "" then
-        self.KeyStatus.Text = "Пожалуйста, введите ключ"
-        self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Error")
+        if self.KeyStatus then
+            self.KeyStatus.Text = "Пожалуйста, введите ключ"
+            self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Error")
+        end
         return
     end
     
     if self:ValidateKey(inputKey) then
         self.KeySystem.CurrentKey = inputKey
         self.KeySystem.KeyValidated = true
-        self.KeyStatus.Text = "Ключ верный! Загрузка..."
-        self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Success")
+        
+        if self.KeyStatus then
+            self.KeyStatus.Text = "Ключ верный! Загрузка..."
+            self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Success")
+        end
         
         if self.KeySystem.KeySettings.SaveKey then
             self:SaveKeyToFile(inputKey)
@@ -1348,8 +1169,10 @@ function NexusUI:OnKeySubmit()
             self:ShowMainUI()
         end)
     else
-        self.KeyStatus.Text = "Неверный ключ"
-        self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Error")
+        if self.KeyStatus then
+            self.KeyStatus.Text = "Неверный ключ"
+            self.KeyStatus.TextColor3 = safeGetColor(self.Colors, "Error")
+        end
     end
 end
 
@@ -1359,7 +1182,7 @@ function NexusUI:ShowMainUI()
     if not self.ScreenGui or not self.MainWindow then return end
     
     pcall(function()
-        if Players.LocalPlayer then
+        if Players.LocalPlayer and self.AvatarImage then
             local userId = Players.LocalPlayer.UserId
             self.AvatarImage.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. userId .. "&width=150&height=150&format=png"
         end
@@ -1462,12 +1285,8 @@ function NexusUI:Destroy()
     self.Config = nil
     
     setmetatable(self, {
-        __index = function()
-            error("NexusUI: Instance has been destroyed")
-        end,
-        __newindex = function()
-            error("NexusUI: Instance has been destroyed")
-        end
+        __index = function() error("NexusUI: Instance has been destroyed") end,
+        __newindex = function() error("NexusUI: Instance has been destroyed") end
     })
 end
 
