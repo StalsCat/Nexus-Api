@@ -1,4 +1,4 @@
--- NexusUI Library v1.0
+-- NexusUI Library v1.1 (Fixed)
 -- By StalsCat, ZestyKJScripts
 local NexusUI = {}
 NexusUI.__index = NexusUI
@@ -33,6 +33,33 @@ NexusUI.DefaultColors = {
     Error = Color3.fromRGB(244, 67, 54)
 }
 
+-- Deep merge function for tables
+local function deepMerge(defaultTable, userTable)
+    if type(userTable) ~= "table" then return defaultTable end
+    
+    local result = {}
+    for key, value in pairs(defaultTable) do
+        if userTable[key] ~= nil then
+            if type(value) == "table" and type(userTable[key]) == "table" then
+                result[key] = deepMerge(value, userTable[key])
+            else
+                result[key] = userTable[key]
+            end
+        else
+            result[key] = value
+        end
+    end
+    return result
+end
+
+-- Safe property access with fallback
+local function safeGetColor(colors, colorName, fallback)
+    if not colors or type(colors) ~= "table" then
+        return fallback or Color3.fromRGB(255, 255, 255)
+    end
+    return colors[colorName] or fallback or Color3.fromRGB(255, 255, 255)
+end
+
 local function stringToKeyCode(keyString)
     if type(keyString) == "string" then
         local success, keyCode = pcall(function()
@@ -55,6 +82,9 @@ function NexusUI.new(config)
     local keySystemConfig = config.KeySystem or {Enabled = false}
     local keySettings = keySystemConfig.KeySettings or {}
     
+    -- Deep merge colors to prevent nil values
+    local mergedColors = deepMerge(NexusUI.DefaultColors, config.Colors or {})
+    
     local self = setmetatable({
         Config = {
             WindowSize = config.WindowSize or NexusUI.DefaultConfig.WindowSize,
@@ -63,7 +93,7 @@ function NexusUI.new(config)
             BlurAmount = config.BlurAmount or NexusUI.DefaultConfig.BlurAmount,
             ToggleKey = config.ToggleKey or NexusUI.DefaultConfig.ToggleKey
         },
-        Colors = config.Colors or NexusUI.DefaultColors,
+        Colors = mergedColors, -- Use merged colors instead of simple OR
         KeySystem = {
             Enabled = keySystemConfig.Enabled or false,
             KeySettings = {
@@ -83,8 +113,14 @@ function NexusUI.new(config)
         Tabs = {},
         CurrentTab = nil,
         Enabled = false,
-        InputConnection = nil
+        InputConnection = nil,
+        Destroyed = false -- Track destruction state
     }, NexusUI)
+    
+    -- Validate critical properties
+    if not self.Colors then
+        self.Colors = NexusUI.DefaultColors
+    end
     
     -- Load saved key if SaveKey is enabled
     if self.KeySystem.Enabled and self.KeySystem.KeySettings.SaveKey then
@@ -102,6 +138,8 @@ end
 
 -- Initialize the UI
 function NexusUI:Initialize()
+    if self.Destroyed then return end
+    
     self:CreateBlurEffect()
     self:CreateMainUI()
     self:SetupEventHandlers()
@@ -127,13 +165,12 @@ function NexusUI:LoadSavedKey()
         if self:ValidateKey(savedKey) then
             self.KeySystem.CurrentKey = savedKey
             self.KeySystem.KeyValidated = true
-            
         end
     end
 end
 
 function NexusUI:SaveKeyToFile(key)
-    if not self.KeySystem.KeySettings.SaveKey then return end
+    if not self.KeySystem.KeySettings.SaveKey then return false end
     
     local success = pcall(function()
         if writefile then
@@ -170,7 +207,6 @@ function NexusUI:GetKeysFromSite()
     end)
     
     if success and keysData then
-        -- Parse keys from site (assuming one key per line)
         local keys = {}
         for key in string.gmatch(keysData, "[^\r\n]+") do
             if key and key ~= "" then
@@ -199,12 +235,23 @@ function NexusUI:ValidateKey(inputKey)
 end
 
 function NexusUI:CreateBlurEffect()
-    self.BlurEffect = Instance.new("BlurEffect")
-    self.BlurEffect.Size = 0
-    self.BlurEffect.Parent = game:GetService("Lighting")
+    if self.Destroyed then return end
+    
+    pcall(function()
+        if self.BlurEffect then
+            self.BlurEffect:Destroy()
+        end
+        
+        self.BlurEffect = Instance.new("BlurEffect")
+        self.BlurEffect.Size = 0
+        self.BlurEffect.Parent = game:GetService("Lighting")
+    end)
 end
 
 function NexusUI:CreateMainUI()
+    if self.Destroyed or not self.Colors then return end
+    
+    -- Safe cleanup of old UI
     pcall(function()
         local oldUI = CoreGui:FindFirstChild("NexusUIModern")
         if oldUI then
@@ -212,6 +259,7 @@ function NexusUI:CreateMainUI()
         end
     end)
     
+    -- Create ScreenGui with validation
     self.ScreenGui = Instance.new("ScreenGui")
     self.ScreenGui.Name = "NexusUIModern"
     self.ScreenGui.Parent = CoreGui
@@ -219,11 +267,12 @@ function NexusUI:CreateMainUI()
     self.ScreenGui.ResetOnSpawn = false
     self.ScreenGui.Enabled = false
     
+    -- Create MainWindow with safe color access
     self.MainWindow = Instance.new("Frame")
     self.MainWindow.Name = "MainWindow"
     self.MainWindow.Size = self.Config.WindowSize
     self.MainWindow.Position = UDim2.new(0.5, -self.Config.WindowSize.X.Offset/2, 0.5, -self.Config.WindowSize.Y.Offset/2)
-    self.MainWindow.BackgroundColor3 = self.Colors.Background
+    self.MainWindow.BackgroundColor3 = safeGetColor(self.Colors, "Background")
     self.MainWindow.BackgroundTransparency = 1
     self.MainWindow.Visible = false
     self.MainWindow.Parent = self.ScreenGui
@@ -233,14 +282,15 @@ function NexusUI:CreateMainUI()
     WindowCorner.Parent = self.MainWindow
     
     local WindowStroke = Instance.new("UIStroke")
-    WindowStroke.Color = self.Colors.SurfaceLight
+    WindowStroke.Color = safeGetColor(self.Colors, "SurfaceLight")
     WindowStroke.Thickness = 1
     WindowStroke.Parent = self.MainWindow
     
+    -- TopBar with safe colors
     self.TopBar = Instance.new("Frame")
     self.TopBar.Name = "TopBar"
     self.TopBar.Size = UDim2.new(1, 0, 0, 40)
-    self.TopBar.BackgroundColor3 = self.Colors.Surface
+    self.TopBar.BackgroundColor3 = safeGetColor(self.Colors, "Surface")
     self.TopBar.Parent = self.MainWindow
     
     local TopBarCorner = Instance.new("UICorner")
@@ -253,7 +303,7 @@ function NexusUI:CreateMainUI()
     self.TitleLabel.Position = UDim2.new(0, 15, 0, 0)
     self.TitleLabel.BackgroundTransparency = 1
     self.TitleLabel.Text = "NEXUS UI"
-    self.TitleLabel.TextColor3 = self.Colors.TextPrimary
+    self.TitleLabel.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     self.TitleLabel.TextSize = 16
     self.TitleLabel.Font = Enum.Font.GothamBold
     self.TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -263,7 +313,7 @@ function NexusUI:CreateMainUI()
     self.CloseButton.Name = "CloseButton"
     self.CloseButton.Size = UDim2.new(0, 25, 0, 25)
     self.CloseButton.Position = UDim2.new(1, -35, 0.5, -12.5)
-    self.CloseButton.BackgroundColor3 = self.Colors.Error
+    self.CloseButton.BackgroundColor3 = safeGetColor(self.Colors, "Error")
     self.CloseButton.Parent = self.TopBar
     
     local CloseCorner = Instance.new("UICorner")
@@ -278,7 +328,7 @@ function NexusUI:CreateMainUI()
     CloseIcon.Image = "rbxassetid://3926305904"
     CloseIcon.ImageRectOffset = Vector2.new(284, 4)
     CloseIcon.ImageRectSize = Vector2.new(24, 24)
-    CloseIcon.ImageColor3 = self.Colors.TextPrimary
+    CloseIcon.ImageColor3 = safeGetColor(self.Colors, "TextPrimary")
     CloseIcon.Parent = self.CloseButton
 
     self.MainContent = Instance.new("Frame")
@@ -291,7 +341,7 @@ function NexusUI:CreateMainUI()
     self.Sidebar = Instance.new("Frame")
     self.Sidebar.Name = "Sidebar"
     self.Sidebar.Size = UDim2.new(0, 200, 1, 0)
-    self.Sidebar.BackgroundColor3 = self.Colors.Surface
+    self.Sidebar.BackgroundColor3 = safeGetColor(self.Colors, "Surface")
     self.Sidebar.Parent = self.MainContent
     
     local SidebarCorner = Instance.new("UICorner")
@@ -304,7 +354,7 @@ function NexusUI:CreateMainUI()
     self.NavigationList.Position = UDim2.new(0, 10, 0, 10)
     self.NavigationList.BackgroundTransparency = 1
     self.NavigationList.ScrollBarThickness = 4
-    self.NavigationList.ScrollBarImageColor3 = self.Colors.SurfaceLight
+    self.NavigationList.ScrollBarImageColor3 = safeGetColor(self.Colors, "SurfaceLight")
     self.NavigationList.CanvasSize = UDim2.new(0, 0, 0, 0)
     self.NavigationList.Parent = self.Sidebar
     
@@ -317,7 +367,7 @@ function NexusUI:CreateMainUI()
     self.ProfileSection.Name = "ProfileSection"
     self.ProfileSection.Size = UDim2.new(1, -20, 0, 80)
     self.ProfileSection.Position = UDim2.new(0, 10, 1, -90)
-    self.ProfileSection.BackgroundColor3 = self.Colors.SurfaceLight
+    self.ProfileSection.BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")
     self.ProfileSection.Parent = self.Sidebar
     
     local ProfileCorner = Instance.new("UICorner")
@@ -328,7 +378,7 @@ function NexusUI:CreateMainUI()
     AvatarFrame.Name = "AvatarFrame"
     AvatarFrame.Size = UDim2.new(0, 50, 0, 50)
     AvatarFrame.Position = UDim2.new(0, 10, 0.5, -25)
-    AvatarFrame.BackgroundColor3 = self.Colors.Surface
+    AvatarFrame.BackgroundColor3 = safeGetColor(self.Colors, "Surface")
     AvatarFrame.Parent = self.ProfileSection
     
     local AvatarCorner = Instance.new("UICorner")
@@ -336,7 +386,7 @@ function NexusUI:CreateMainUI()
     AvatarCorner.Parent = AvatarFrame
     
     local AvatarStroke = Instance.new("UIStroke")
-    AvatarStroke.Color = self.Colors.Primary
+    AvatarStroke.Color = safeGetColor(self.Colors, "Primary")
     AvatarStroke.Thickness = 2
     AvatarStroke.Parent = AvatarFrame
     
@@ -354,7 +404,7 @@ function NexusUI:CreateMainUI()
     self.UsernameLabel.Position = UDim2.new(0, 65, 0, 20)
     self.UsernameLabel.BackgroundTransparency = 1
     self.UsernameLabel.Text = Players.LocalPlayer.Name or "Player"
-    self.UsernameLabel.TextColor3 = self.Colors.TextPrimary
+    self.UsernameLabel.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     self.UsernameLabel.TextSize = 14
     self.UsernameLabel.Font = Enum.Font.GothamBold
     self.UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -367,7 +417,7 @@ function NexusUI:CreateMainUI()
     self.WelcomeLabel.Position = UDim2.new(0, 65, 0, 42)
     self.WelcomeLabel.BackgroundTransparency = 1
     self.WelcomeLabel.Text = "Добро пожаловать!"
-    self.WelcomeLabel.TextColor3 = self.Colors.TextSecondary
+    self.WelcomeLabel.TextColor3 = safeGetColor(self.Colors, "TextSecondary")
     self.WelcomeLabel.TextSize = 12
     self.WelcomeLabel.Font = Enum.Font.Gotham
     self.WelcomeLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -389,11 +439,13 @@ function NexusUI:CreateMainUI()
 end
 
 function NexusUI:CreateKeySystem()
+    if self.Destroyed or not self.Colors then return end
+    
     self.KeySystemUI = Instance.new("Frame")
     self.KeySystemUI.Name = "KeySystem"
     self.KeySystemUI.Size = UDim2.new(0, 450, 0, 400)
     self.KeySystemUI.Position = UDim2.new(0.5, -225, 0.5, -200)
-    self.KeySystemUI.BackgroundColor3 = self.Colors.Background
+    self.KeySystemUI.BackgroundColor3 = safeGetColor(self.Colors, "Background")
     self.KeySystemUI.BackgroundTransparency = 1
     self.KeySystemUI.Visible = false
     self.KeySystemUI.Parent = self.ScreenGui
@@ -403,7 +455,7 @@ function NexusUI:CreateKeySystem()
     KeySystemCorner.Parent = self.KeySystemUI
     
     local KeySystemStroke = Instance.new("UIStroke")
-    KeySystemStroke.Color = self.Colors.SurfaceLight
+    KeySystemStroke.Color = safeGetColor(self.Colors, "SurfaceLight")
     KeySystemStroke.Thickness = 1
     KeySystemStroke.Parent = self.KeySystemUI
    
@@ -411,9 +463,9 @@ function NexusUI:CreateKeySystem()
     KeyTitle.Name = "KeyTitle"
     KeyTitle.Size = UDim2.new(1, 0, 0, 80)
     KeyTitle.Position = UDim2.new(0, 0, 0, 0)
-    KeyTitle.BackgroundColor3 = self.Colors.Surface
+    KeyTitle.BackgroundColor3 = safeGetColor(self.Colors, "Surface")
     KeyTitle.Text = self.KeySystem.KeySettings.Title
-    KeyTitle.TextColor3 = self.Colors.TextPrimary
+    KeyTitle.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     KeyTitle.TextSize = 24
     KeyTitle.Font = Enum.Font.GothamBold
     KeyTitle.Parent = self.KeySystemUI
@@ -428,7 +480,7 @@ function NexusUI:CreateKeySystem()
     KeySubtitle.Position = UDim2.new(0, 20, 0, 90)
     KeySubtitle.BackgroundTransparency = 1
     KeySubtitle.Text = self.KeySystem.KeySettings.Subtitle
-    KeySubtitle.TextColor3 = self.Colors.TextSecondary
+    KeySubtitle.TextColor3 = safeGetColor(self.Colors, "TextSecondary")
     KeySubtitle.TextSize = 16
     KeySubtitle.Font = Enum.Font.Gotham
     KeySubtitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -438,11 +490,11 @@ function NexusUI:CreateKeySystem()
     self.KeyInput.Name = "KeyInput"
     self.KeyInput.Size = UDim2.new(1, -40, 0, 45)
     self.KeyInput.Position = UDim2.new(0, 20, 0, 130)
-    self.KeyInput.BackgroundColor3 = self.Colors.SurfaceLight
-    self.KeyInput.TextColor3 = self.Colors.TextPrimary
+    self.KeyInput.BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")
+    self.KeyInput.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     self.KeyInput.Text = ""
     self.KeyInput.PlaceholderText = "Введите ваш ключ..."
-    self.KeyInput.PlaceholderColor3 = self.Colors.TextSecondary
+    self.KeyInput.PlaceholderColor3 = safeGetColor(self.Colors, "TextSecondary")
     self.KeyInput.TextSize = 16
     self.KeyInput.Font = Enum.Font.Gotham
     self.KeyInput.Parent = self.KeySystemUI
@@ -455,8 +507,8 @@ function NexusUI:CreateKeySystem()
     self.KeySubmit.Name = "KeySubmit"
     self.KeySubmit.Size = UDim2.new(1, -40, 0, 45)
     self.KeySubmit.Position = UDim2.new(0, 20, 0, 190)
-    self.KeySubmit.BackgroundColor3 = self.Colors.Primary
-    self.KeySubmit.TextColor3 = self.Colors.TextPrimary
+    self.KeySubmit.BackgroundColor3 = safeGetColor(self.Colors, "Primary")
+    self.KeySubmit.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     self.KeySubmit.Text = "АКТИВИРОВАТЬ"
     self.KeySubmit.TextSize = 16
     self.KeySubmit.Font = Enum.Font.GothamBold
@@ -472,7 +524,7 @@ function NexusUI:CreateKeySystem()
     KeyNote.Position = UDim2.new(0, 20, 0, 250)
     KeyNote.BackgroundTransparency = 1
     KeyNote.Text = self.KeySystem.KeySettings.Note
-    KeyNote.TextColor3 = self.Colors.TextSecondary
+    KeyNote.TextColor3 = safeGetColor(self.Colors, "TextSecondary")
     KeyNote.TextSize = 12
     KeyNote.Font = Enum.Font.Gotham
     KeyNote.TextWrapped = true
@@ -484,7 +536,7 @@ function NexusUI:CreateKeySystem()
     self.KeyMessage.Position = UDim2.new(0, 20, 0, 320)
     self.KeyMessage.BackgroundTransparency = 1
     self.KeyMessage.Text = "Введите ключ для доступа к интерфейсу"
-    self.KeyMessage.TextColor3 = self.Colors.TextSecondary
+    self.KeyMessage.TextColor3 = safeGetColor(self.Colors, "TextSecondary")
     self.KeyMessage.TextSize = 14
     self.KeyMessage.Font = Enum.Font.Gotham
     self.KeyMessage.TextWrapped = true
@@ -492,14 +544,14 @@ function NexusUI:CreateKeySystem()
 end
 
 function NexusUI:ShowKeySystem()
-    if not self.ScreenGui then return end
+    if self.Destroyed or not self.ScreenGui or not self.KeySystemUI then return end
     
     self.ScreenGui.Enabled = true
     self.KeySystemUI.Visible = true
     self.KeySystemUI.BackgroundTransparency = 1
     
-    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.5), {BackgroundTransparency = 0}):Play()
-    TweenService:Create(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount}):Play()
+    self:SafeTween(self.KeySystemUI, TweenInfo.new(0.5), {BackgroundTransparency = 0})
+    self:SafeTween(self.BlurEffect, TweenInfo.new(0.5), {Size = self.Config.BlurAmount})
     
     if self.KeySystem.KeySettings.Key then
         print("=== NEXUS KEY SYSTEM ===")
@@ -512,107 +564,124 @@ function NexusUI:ShowKeySystem()
 end
 
 function NexusUI:HideKeySystem()
-    if not self.KeySystemUI then return end
+    if self.Destroyed or not self.KeySystemUI then return end
     
-    TweenService:Create(self.KeySystemUI, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+    self:SafeTween(self.KeySystemUI, TweenInfo.new(0.3), {BackgroundTransparency = 1})
     wait(0.3)
     self.KeySystemUI.Visible = false
 end
 
 function NexusUI:OnKeySubmit()
+    if self.Destroyed then return end
+    
     local key = self.KeyInput.Text
     
     if self:ValidateKey(key) then
         self.KeySystem.CurrentKey = key
         self.KeySystem.KeyValidated = true
         self.KeyMessage.Text = "✅ Ключ принят! Загрузка..."
-        self.KeyMessage.TextColor3 = self.Colors.Success
+        self.KeyMessage.TextColor3 = safeGetColor(self.Colors, "Success")
         
         if self.KeySystem.KeySettings.SaveKey then
             self:SaveKeyToFile(key)
         end
         
-        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Success}):Play()
+        self:SafeTween(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = safeGetColor(self.Colors, "Success")})
         
         wait(1.5)
         self:HideKeySystem()
         self:ShowMainUI()
     else
         self.KeyMessage.Text = "❌ Неверный ключ! Попробуйте снова."
-        self.KeyMessage.TextColor3 = self.Colors.Error
+        self.KeyMessage.TextColor3 = safeGetColor(self.Colors, "Error")
         
-        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Error}):Play()
+        self:SafeTween(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = safeGetColor(self.Colors, "Error")})
         wait(1)
-        TweenService:Create(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = self.Colors.Primary}):Play()
+        self:SafeTween(self.KeySubmit, TweenInfo.new(0.3), {BackgroundColor3 = safeGetColor(self.Colors, "Primary")})
     end
 end
 
 function NexusUI:SetupEventHandlers()
+    if self.Destroyed then return end
+    
+    -- Safe event connection with pcall
     if self.KeySubmit then
-        self.KeySubmit.MouseButton1Click:Connect(function()
-            self:OnKeySubmit()
+        pcall(function()
+            self.KeySubmit.MouseButton1Click:Connect(function()
+                self:OnKeySubmit()
+            end)
         end)
     end
 
     if self.TopBar then
-        self.TopBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                self.dragging = true
-                self.dragStart = input.Position
-                self.startPos = self.MainWindow.Position
-                
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        self.dragging = false
-                    end
-                end)
-            end
-        end)
-        
-        self.TopBar.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
-                self.dragInput = input
-            end
+        pcall(function()
+            self.TopBar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    self.dragging = true
+                    self.dragStart = input.Position
+                    self.startPos = self.MainWindow.Position
+                    
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then
+                            self.dragging = false
+                        end
+                    end)
+                end
+            end)
+            
+            self.TopBar.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    self.dragInput = input
+                end
+            end)
         end)
     end
     
-    UserInputService.InputChanged:Connect(function(input)
-        if input == self.dragInput and self.dragging and self.MainWindow then
-            self:UpdateInput(input)
-        end
+    pcall(function()
+        UserInputService.InputChanged:Connect(function(input)
+            if input == self.dragInput and self.dragging and self.MainWindow then
+                self:UpdateInput(input)
+            end
+        end)
     end)
 
     if self.CloseButton then
-        self.CloseButton.MouseButton1Click:Connect(function()
-            self:HideMainUI()
+        pcall(function()
+            self.CloseButton.MouseButton1Click:Connect(function()
+                self:HideMainUI()
+            end)
         end)
     end
 
-    self.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        
-        if input.KeyCode == self.Config.ToggleKey then
-            if not self.Enabled then
-                if self.KeySystem.Enabled and not self.KeySystem.KeyValidated then
-                    self:ShowKeySystem()
+    pcall(function()
+        self.InputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            
+            if input.KeyCode == self.Config.ToggleKey then
+                if not self.Enabled then
+                    if self.KeySystem.Enabled and not self.KeySystem.KeyValidated then
+                        self:ShowKeySystem()
+                    else
+                        self:ShowMainUI()
+                    end
                 else
-                    self:ShowMainUI()
+                    self:HideMainUI()
                 end
-            else
-                self:HideMainUI()
             end
-        end
+        end)
     end)
     
-    Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            self:Destroy()
-        end
+    pcall(function()
+        Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
+            if not parent then
+                self:Destroy()
+            end
+        end)
     end)
 end
 
 function NexusUI:UpdateInput(input)
-    if not self.MainWindow or not self.MainWindow.Parent then return end
+    if self.Destroyed or not self.MainWindow or not self.MainWindow.Parent then return end
     local delta = input.Position - self.dragStart
     self.MainWindow.Position = UDim2.new(
         self.startPos.X.Scale, 
@@ -623,7 +692,7 @@ function NexusUI:UpdateInput(input)
 end
 
 function NexusUI:ShowMainUI()
-    if not self.ScreenGui or not self.ScreenGui.Parent then return end
+    if self.Destroyed or not self.ScreenGui or not self.ScreenGui.Parent or not self.MainWindow then return end
     
     pcall(function()
         local userId = Players.LocalPlayer.UserId
@@ -654,7 +723,7 @@ function NexusUI:ShowMainUI()
 end
 
 function NexusUI:HideMainUI()
-    if not self.ScreenGui then return end
+    if self.Destroyed or not self.ScreenGui then return end
     
     self:SafeTween(self.MainWindow, TweenInfo.new(self.Config.AnimationDuration, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
         BackgroundTransparency = 1,
@@ -664,22 +733,37 @@ function NexusUI:HideMainUI()
     self:SafeTween(self.BlurEffect, TweenInfo.new(0.3), {Size = 0})
     
     wait(self.Config.AnimationDuration)
-    self.MainWindow.Visible = false
+    if self.MainWindow then
+        self.MainWindow.Visible = false
+    end
     self.ScreenGui.Enabled = false
     self.Enabled = false
 end
 
+-- Improved SafeTween with comprehensive checks
 function NexusUI:SafeTween(object, tweenInfo, properties)
-    if object and object.Parent then
+    if self.Destroyed or not object or not object.Parent then 
+        return nil 
+    end
+    
+    local success, tween = pcall(function()
         local tween = TweenService:Create(object, tweenInfo, properties)
         tween:Play()
         return tween
+    end)
+    
+    if not success then
+        warn("NexusUI: Failed to create tween for object " .. tostring(object))
+        return nil
     end
-    return nil
+    
+    return tween
 end
 
--- Tab management
+-- Tab management with validation
 function NexusUI:CreateTab(tabConfig)
+    if self.Destroyed then return nil end
+    
     if not tabConfig or type(tabConfig) ~= "table" then
         warn("NexusUI: Invalid tab configuration")
         return nil
@@ -688,6 +772,12 @@ function NexusUI:CreateTab(tabConfig)
     local tabName = tabConfig.Name
     if not tabName or type(tabName) ~= "string" then
         warn("NexusUI: Tab name is required and must be a string")
+        return nil
+    end
+    
+    -- Validate parent containers exist
+    if not self.NavigationList or not self.ContentPages then
+        warn("NexusUI: Required parent containers not found")
         return nil
     end
     
@@ -708,8 +798,10 @@ function NexusUI:CreateTab(tabConfig)
     }
     
     -- Set click handler
-    navButton.MouseButton1Click:Connect(function()
-        self:SelectTab(tabName)
+    pcall(function()
+        navButton.MouseButton1Click:Connect(function()
+            self:SelectTab(tabName)
+        end)
     end)
     
     -- Select first tab automatically
@@ -719,10 +811,12 @@ function NexusUI:CreateTab(tabConfig)
     
     -- Update navigation list size
     if self.NavigationLayout then
-        self.NavigationLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            if self.NavigationList then
-                self.NavigationList.CanvasSize = UDim2.new(0, 0, 0, self.NavigationLayout.AbsoluteContentSize.Y)
-            end
+        pcall(function()
+            self.NavigationLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                if self.NavigationList and self.NavigationList.Parent then
+                    self.NavigationList.CanvasSize = UDim2.new(0, 0, 0, self.NavigationLayout.AbsoluteContentSize.Y)
+                end
+            end)
         end)
     end
     
@@ -730,6 +824,7 @@ function NexusUI:CreateTab(tabConfig)
     local tabAPI = {}
     
     function tabAPI.AddButton(buttonConfig)
+        if self.Destroyed then return nil end
         if not buttonConfig or type(buttonConfig) ~= "table" then
             warn("NexusUI: Invalid button configuration")
             return nil
@@ -738,6 +833,7 @@ function NexusUI:CreateTab(tabConfig)
     end
     
     function tabAPI.AddToggle(toggleConfig)
+        if self.Destroyed then return nil end
         if not toggleConfig or type(toggleConfig) ~= "table" then
             warn("NexusUI: Invalid toggle configuration")
             return nil
@@ -746,6 +842,7 @@ function NexusUI:CreateTab(tabConfig)
     end
     
     function tabAPI.AddSection(sectionConfig)
+        if self.Destroyed then return nil end
         if not sectionConfig or type(sectionConfig) ~= "table" then
             warn("NexusUI: Invalid section configuration")
             return nil
@@ -754,6 +851,7 @@ function NexusUI:CreateTab(tabConfig)
     end
     
     function tabAPI.AddLabel(labelConfig)
+        if self.Destroyed then return nil end
         if not labelConfig or type(labelConfig) ~= "table" then
             warn("NexusUI: Invalid label configuration")
             return nil
@@ -776,21 +874,21 @@ function NexusUI:CreateTab(tabConfig)
 end
 
 function NexusUI:SelectTab(tabName)
-    if not self.Tabs[tabName] then return end
+    if self.Destroyed or not self.Tabs[tabName] then return end
     
     -- Deselect all buttons
     for name, tabData in pairs(self.Tabs) do
         if tabData.Button and tabData.Button.Parent then
             tabData.Button:SetAttribute("Selected", false)
-            self:SafeTween(tabData.Button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
+            self:SafeTween(tabData.Button, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")})
             if tabData.Button:FindFirstChild("Highlight") then
                 self:SafeTween(tabData.Button.Highlight, TweenInfo.new(0.2), {BackgroundTransparency = 1})
             end
             if tabData.Button:FindFirstChild("Label") then
-                self:SafeTween(tabData.Button.Label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextSecondary})
+                self:SafeTween(tabData.Button.Label, TweenInfo.new(0.2), {TextColor3 = safeGetColor(self.Colors, "TextSecondary")})
             end
             if tabData.Button:FindFirstChild("Icon") then
-                self:SafeTween(tabData.Button.Icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextSecondary})
+                self:SafeTween(tabData.Button.Icon, TweenInfo.new(0.2), {ImageColor3 = safeGetColor(self.Colors, "TextSecondary")})
             end
         end
     end
@@ -805,31 +903,33 @@ function NexusUI:SelectTab(tabName)
     -- Select current button and show page
     local currentTab = self.Tabs[tabName]
     currentTab.Button:SetAttribute("Selected", true)
-    self:SafeTween(currentTab.Button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.Primary})
+    self:SafeTween(currentTab.Button, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "Primary")})
     if currentTab.Button:FindFirstChild("Highlight") then
         self:SafeTween(currentTab.Button.Highlight, TweenInfo.new(0.2), {BackgroundTransparency = 0})
     end
     if currentTab.Button:FindFirstChild("Label") then
-        self:SafeTween(currentTab.Button.Label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextPrimary})
+        self:SafeTween(currentTab.Button.Label, TweenInfo.new(0.2), {TextColor3 = safeGetColor(self.Colors, "TextPrimary")})
     end
     if currentTab.Button:FindFirstChild("Icon") then
-        self:SafeTween(currentTab.Button.Icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextPrimary})
+        self:SafeTween(currentTab.Button.Icon, TweenInfo.new(0.2), {ImageColor3 = safeGetColor(self.Colors, "TextPrimary")})
     end
     
-    currentTab.Page.Visible = true
+    if currentTab.Page then
+        currentTab.Page.Visible = true
+    end
     self.CurrentTab = tabName
 end
 
--- UI element creation functions
+-- UI element creation functions with safety
 function NexusUI:CreateNavButton(navConfig)
-    if not navConfig or not navConfig.Name or not self.NavigationList then
+    if self.Destroyed or not navConfig or not navConfig.Name or not self.NavigationList then
         return nil
     end
     
     local button = Instance.new("TextButton")
     button.Name = navConfig.Name .. "Nav"
     button.Size = UDim2.new(1, 0, 0, 40)
-    button.BackgroundColor3 = self.Colors.SurfaceLight
+    button.BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")
     button.Text = ""
     button.Parent = self.NavigationList
     
@@ -843,7 +943,7 @@ function NexusUI:CreateNavButton(navConfig)
     icon.Position = UDim2.new(0, 12, 0.5, -10)
     icon.BackgroundTransparency = 1
     icon.Image = navConfig.Icon or "rbxassetid://3926305904"
-    icon.ImageColor3 = self.Colors.TextSecondary
+    icon.ImageColor3 = safeGetColor(self.Colors, "TextSecondary")
     icon.Parent = button
     
     local label = Instance.new("TextLabel")
@@ -852,7 +952,7 @@ function NexusUI:CreateNavButton(navConfig)
     label.Position = UDim2.new(0, 40, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = navConfig.Name
-    label.TextColor3 = self.Colors.TextSecondary
+    label.TextColor3 = safeGetColor(self.Colors, "TextSecondary")
     label.TextSize = 13
     label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -862,7 +962,7 @@ function NexusUI:CreateNavButton(navConfig)
     highlight.Name = "Highlight"
     highlight.Size = UDim2.new(0, 3, 0.6, 0)
     highlight.Position = UDim2.new(0, 0, 0.2, 0)
-    highlight.BackgroundColor3 = self.Colors.Primary
+    highlight.BackgroundColor3 = safeGetColor(self.Colors, "Primary")
     highlight.BackgroundTransparency = 1
     highlight.Parent = button
     
@@ -870,28 +970,30 @@ function NexusUI:CreateNavButton(navConfig)
     highlightCorner.CornerRadius = UDim.new(1, 0)
     highlightCorner.Parent = highlight
     
-    -- Hover effects
-    button.MouseEnter:Connect(function()
-        if not button:GetAttribute("Selected") then
-            self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
-            self:SafeTween(label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextPrimary})
-            self:SafeTween(icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextPrimary})
-        end
-    end)
-    
-    button.MouseLeave:Connect(function()
-        if not button:GetAttribute("Selected") then
-            self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
-            self:SafeTween(label, TweenInfo.new(0.2), {TextColor3 = self.Colors.TextSecondary})
-            self:SafeTween(icon, TweenInfo.new(0.2), {ImageColor3 = self.Colors.TextSecondary})
-        end
+    -- Hover effects with safety
+    pcall(function()
+        button.MouseEnter:Connect(function()
+            if not button:GetAttribute("Selected") then
+                self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")})
+                self:SafeTween(label, TweenInfo.new(0.2), {TextColor3 = safeGetColor(self.Colors, "TextPrimary")})
+                self:SafeTween(icon, TweenInfo.new(0.2), {ImageColor3 = safeGetColor(self.Colors, "TextPrimary")})
+            end
+        end)
+        
+        button.MouseLeave:Connect(function()
+            if not button:GetAttribute("Selected") then
+                self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")})
+                self:SafeTween(label, TweenInfo.new(0.2), {TextColor3 = safeGetColor(self.Colors, "TextSecondary")})
+                self:SafeTween(icon, TweenInfo.new(0.2), {ImageColor3 = safeGetColor(self.Colors, "TextSecondary")})
+            end
+        end)
     end)
     
     return button
 end
 
 function NexusUI:CreateContentPage(pageConfig)
-    if not pageConfig or not pageConfig.Name or not self.ContentPages then
+    if self.Destroyed or not pageConfig or not pageConfig.Name or not self.ContentPages then
         return nil
     end
     
@@ -900,7 +1002,7 @@ function NexusUI:CreateContentPage(pageConfig)
     page.Size = UDim2.new(1, 0, 1, 0)
     page.BackgroundTransparency = 1
     page.ScrollBarThickness = 4
-    page.ScrollBarImageColor3 = self.Colors.SurfaceLight
+    page.ScrollBarImageColor3 = safeGetColor(self.Colors, "SurfaceLight")
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.Visible = false
     page.Parent = self.ContentPages
@@ -917,17 +1019,19 @@ function NexusUI:CreateContentPage(pageConfig)
     padding.PaddingBottom = UDim.new(0, 15)
     padding.Parent = page
     
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        if page and page.Parent then
-            page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
-        end
+    pcall(function()
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            if page and page.Parent then
+                page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
+            end
+        end)
     end)
     
     return page
 end
 
 function NexusUI:AddSectionToTab(tabName, sectionConfig)
-    if not self.Tabs[tabName] then 
+    if self.Destroyed or not self.Tabs[tabName] then 
         warn("NexusUI: Tab '" .. tostring(tabName) .. "' does not exist")
         return nil
     end
@@ -943,7 +1047,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     end
     
     local tab = self.Tabs[tabName]
-    local section = self:CreateRoundedFrame(tab.Page, UDim2.new(1, 0, 0, 50), nil, self.Colors.Surface)
+    local section = self:CreateRoundedFrame(tab.Page, UDim2.new(1, 0, 0, 50), nil, safeGetColor(self.Colors, "Surface"))
     section.BackgroundTransparency = 0
     
     local title = Instance.new("TextLabel")
@@ -952,7 +1056,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     title.Position = UDim2.new(0, 15, 0, 12)
     title.BackgroundTransparency = 1
     title.Text = sectionConfig.Name
-    title.TextColor3 = self.Colors.TextPrimary
+    title.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     title.TextSize = 14
     title.Font = Enum.Font.GothamBold
     title.TextXAlignment = Enum.TextXAlignment.Left
@@ -970,11 +1074,13 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     contentLayout.Padding = UDim.new(0, 8)
     contentLayout.Parent = content
     
-    contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        if content and content.Parent then
-            content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
-            section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
-        end
+    pcall(function()
+        contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            if content and content.Parent then
+                content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
+                section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
+            end
+        end)
     end)
     
     -- Store section in tab elements
@@ -988,6 +1094,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     local sectionAPI = {}
     
     function sectionAPI.AddButton(buttonConfig)
+        if self.Destroyed then return nil end
         if not buttonConfig or type(buttonConfig) ~= "table" then
             warn("NexusUI: Invalid button configuration")
             return nil
@@ -996,6 +1103,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     end
     
     function sectionAPI.AddToggle(toggleConfig)
+        if self.Destroyed then return nil end
         if not toggleConfig or type(toggleConfig) ~= "table" then
             warn("NexusUI: Invalid toggle configuration")
             return nil
@@ -1004,6 +1112,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     end
     
     function sectionAPI.AddLabel(labelConfig)
+        if self.Destroyed then return nil end
         if not labelConfig or type(labelConfig) ~= "table" then
             warn("NexusUI: Invalid label configuration")
             return nil
@@ -1011,22 +1120,11 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         return self:CreateLabel(content, labelConfig)
     end
     
-    -- Placeholder methods for future features
-    function sectionAPI.AddColorPicker(colorConfig)
-        warn("NexusUI: ColorPicker not implemented in this version")
-        return nil
-    end
-    
-    function sectionAPI.AddDropdown(dropdownConfig)
-        warn("NexusUI: Dropdown not implemented in this version")
-        return nil
-    end
-    
     return sectionAPI
 end
 
 function NexusUI:AddButtonToTab(tabName, buttonConfig)
-    if not self.Tabs[tabName] then return nil end
+    if self.Destroyed or not self.Tabs[tabName] then return nil end
     
     local tab = self.Tabs[tabName]
     local button = self:CreateButton(tab.Page, buttonConfig)
@@ -1041,13 +1139,8 @@ function NexusUI:AddButtonToTab(tabName, buttonConfig)
     return button
 end
 
-function NexusUI:AddButtonToSection(sectionContent, buttonConfig)
-    local button = self:CreateButton(sectionContent, buttonConfig)
-    return button
-end
-
 function NexusUI:CreateButton(parent, buttonConfig)
-    if not buttonConfig or type(buttonConfig) ~= "table" then
+    if self.Destroyed or not buttonConfig or type(buttonConfig) ~= "table" then
         warn("NexusUI: Invalid button configuration")
         return nil
     end
@@ -1060,9 +1153,9 @@ function NexusUI:CreateButton(parent, buttonConfig)
     local button = Instance.new("TextButton")
     button.Name = buttonConfig.Name .. "Button"
     button.Size = UDim2.new(1, 0, 0, 35)
-    button.BackgroundColor3 = self.Colors.Primary
+    button.BackgroundColor3 = safeGetColor(self.Colors, "Primary")
     button.Text = buttonConfig.Name
-    button.TextColor3 = self.Colors.TextPrimary
+    button.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     button.TextSize = 13
     button.Font = Enum.Font.Gotham
     button.Parent = parent
@@ -1072,17 +1165,21 @@ function NexusUI:CreateButton(parent, buttonConfig)
     corner.Parent = button
     
     -- Hover effects
-    button.MouseEnter:Connect(function()
-        self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.PrimaryDark})
-    end)
-    
-    button.MouseLeave:Connect(function()
-        self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.Primary})
+    pcall(function()
+        button.MouseEnter:Connect(function()
+            self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "PrimaryDark")})
+        end)
+        
+        button.MouseLeave:Connect(function()
+            self:SafeTween(button, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "Primary")})
+        end)
     end)
     
     if buttonConfig.Callback and type(buttonConfig.Callback) == "function" then
-        button.MouseButton1Click:Connect(function()
-            pcall(buttonConfig.Callback)
+        pcall(function()
+            button.MouseButton1Click:Connect(function()
+                pcall(buttonConfig.Callback)
+            end)
         end)
     end
     
@@ -1090,7 +1187,7 @@ function NexusUI:CreateButton(parent, buttonConfig)
 end
 
 function NexusUI:AddToggleToTab(tabName, toggleConfig)
-    if not self.Tabs[tabName] then return nil end
+    if self.Destroyed or not self.Tabs[tabName] then return nil end
     
     local tab = self.Tabs[tabName]
     local toggle = self:CreateToggle(tab.Page, toggleConfig)
@@ -1105,13 +1202,8 @@ function NexusUI:AddToggleToTab(tabName, toggleConfig)
     return toggle
 end
 
-function NexusUI:AddToggleToSection(sectionContent, toggleConfig)
-    local toggle = self:CreateToggle(sectionContent, toggleConfig)
-    return toggle
-end
-
 function NexusUI:CreateToggle(parent, toggleConfig)
-    if not toggleConfig or type(toggleConfig) ~= "table" then
+    if self.Destroyed or not toggleConfig or type(toggleConfig) ~= "table" then
         warn("NexusUI: Invalid toggle configuration")
         return nil
     end
@@ -1132,7 +1224,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
     label.Size = UDim2.new(0.7, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.Text = toggleConfig.Name
-    label.TextColor3 = self.Colors.TextPrimary
+    label.TextColor3 = safeGetColor(self.Colors, "TextPrimary")
     label.TextSize = 13
     label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -1142,7 +1234,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
     toggleButton.Name = "ToggleButton"
     toggleButton.Size = UDim2.new(0, 45, 0, 22)
     toggleButton.Position = UDim2.new(1, -45, 0.5, -11)
-    toggleButton.BackgroundColor3 = self.Colors.SurfaceLight
+    toggleButton.BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")
     toggleButton.Text = ""
     toggleButton.Parent = toggle
     
@@ -1154,7 +1246,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
     toggleKnob.Name = "ToggleKnob"
     toggleKnob.Size = UDim2.new(0, 18, 0, 18)
     toggleKnob.Position = UDim2.new(0, 2, 0.5, -9)
-    toggleKnob.BackgroundColor3 = self.Colors.TextPrimary
+    toggleKnob.BackgroundColor3 = safeGetColor(self.Colors, "TextPrimary")
     toggleKnob.Parent = toggleButton
     
     local knobCorner = Instance.new("UICorner")
@@ -1165,26 +1257,29 @@ function NexusUI:CreateToggle(parent, toggleConfig)
     
     local function updateToggle()
         if currentValue then
-            self:SafeTween(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.Primary})
+            self:SafeTween(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "Primary")})
             self:SafeTween(toggleKnob, TweenInfo.new(0.2), {Position = UDim2.new(1, -20, 0.5, -9)})
         else
-            self:SafeTween(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = self.Colors.SurfaceLight})
+            self:SafeTween(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight")})
             self:SafeTween(toggleKnob, TweenInfo.new(0.2), {Position = UDim2.new(0, 2, 0.5, -9)})
         end
     end
     
-    toggleButton.MouseButton1Click:Connect(function()
-        currentValue = not currentValue
-        updateToggle()
-        if toggleConfig.Callback and type(toggleConfig.Callback) == "function" then
-            pcall(toggleConfig.Callback, currentValue)
-        end
+    pcall(function()
+        toggleButton.MouseButton1Click:Connect(function()
+            currentValue = not currentValue
+            updateToggle()
+            if toggleConfig.Callback and type(toggleConfig.Callback) == "function" then
+                pcall(toggleConfig.Callback, currentValue)
+            end
+        end)
     end)
     
     updateToggle()
     
     local toggleObject = {}
     function toggleObject:Set(value)
+        if self.Destroyed then return end
         if type(value) == "boolean" then
             currentValue = value
             updateToggle()
@@ -1199,7 +1294,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
 end
 
 function NexusUI:AddLabelToTab(tabName, labelConfig)
-    if not self.Tabs[tabName] then return nil end
+    if self.Destroyed or not self.Tabs[tabName] then return nil end
     
     local tab = self.Tabs[tabName]
     local label = self:CreateLabel(tab.Page, labelConfig)
@@ -1214,13 +1309,8 @@ function NexusUI:AddLabelToTab(tabName, labelConfig)
     return label
 end
 
-function NexusUI:AddLabelToSection(sectionContent, labelConfig)
-    local label = self:CreateLabel(sectionContent, labelConfig)
-    return label
-end
-
 function NexusUI:CreateLabel(parent, labelConfig)
-    if not labelConfig or type(labelConfig) ~= "table" then
+    if self.Destroyed or not labelConfig or type(labelConfig) ~= "table" then
         warn("NexusUI: Invalid label configuration")
         return nil
     end
@@ -1235,7 +1325,7 @@ function NexusUI:CreateLabel(parent, labelConfig)
     label.Size = UDim2.new(1, 0, 0, labelConfig.Height or 20)
     label.BackgroundTransparency = 1
     label.Text = labelConfig.Text
-    label.TextColor3 = labelConfig.Color or self.Colors.TextPrimary
+    label.TextColor3 = labelConfig.Color or safeGetColor(self.Colors, "TextPrimary")
     label.TextSize = labelConfig.TextSize or 13
     label.Font = labelConfig.Font or Enum.Font.Gotham
     label.TextXAlignment = labelConfig.Alignment or Enum.TextXAlignment.Left
@@ -1246,11 +1336,11 @@ function NexusUI:CreateLabel(parent, labelConfig)
 end
 
 function NexusUI:CreateRoundedFrame(parent, size, position, backgroundColor)
-    if not parent then return nil end
+    if self.Destroyed or not parent then return nil end
     local frame = Instance.new("Frame")
     frame.Size = size or UDim2.new(1, 0, 1, 0)
     frame.Position = position or UDim2.new(0, 0, 0, 0)
-    frame.BackgroundColor3 = backgroundColor or self.Colors.Surface
+    frame.BackgroundColor3 = backgroundColor or safeGetColor(self.Colors, "Surface")
     frame.Parent = parent
     
     local corner = Instance.new("UICorner")
@@ -1261,20 +1351,19 @@ function NexusUI:CreateRoundedFrame(parent, size, position, backgroundColor)
 end
 
 function NexusUI:SetTitle(title)
-    if self.TitleLabel and type(title) == "string" then
-        self.TitleLabel.Text = title
-    end
+    if self.Destroyed or not self.TitleLabel or type(title) ~= "string" then return end
+    self.TitleLabel.Text = title
 end
 
 function NexusUI:SetWindowSize(size)
-    if self.MainWindow then
-        self.Config.WindowSize = size
-        self.MainWindow.Size = size
-        self.MainWindow.Position = UDim2.new(0.5, -size.X.Offset/2, 0.5, -size.Y.Offset/2)
-    end
+    if self.Destroyed or not self.MainWindow then return end
+    self.Config.WindowSize = size
+    self.MainWindow.Size = size
+    self.MainWindow.Position = UDim2.new(0.5, -size.X.Offset/2, 0.5, -size.Y.Offset/2)
 end
 
 function NexusUI:Toggle()
+    if self.Destroyed then return end
     if not self.Enabled then
         self:ShowMainUI()
     else
@@ -1283,32 +1372,48 @@ function NexusUI:Toggle()
 end
 
 function NexusUI:Show()
+    if self.Destroyed then return end
     self:ShowMainUI()
 end
 
 function NexusUI:Hide()
+    if self.Destroyed then return end
     self:HideMainUI()
 end
 
+-- Improved Destroy method with comprehensive cleanup
 function NexusUI:Destroy()
+    if self.Destroyed then return end
+    
+    self.Destroyed = true
+    self.Enabled = false
+    
+    -- Disconnect input connection
     if self.InputConnection then
         self.InputConnection:Disconnect()
         self.InputConnection = nil
     end
     
-    if self.ScreenGui then
-        self.ScreenGui:Destroy()
-        self.ScreenGui = nil
-    end
+    -- Clean up UI elements safely
+    pcall(function()
+        if self.ScreenGui then
+            self.ScreenGui:Destroy()
+            self.ScreenGui = nil
+        end
+    end)
     
-    if self.BlurEffect then
-        self.BlurEffect:Destroy()
-        self.BlurEffect = nil
-    end
+    pcall(function()
+        if self.BlurEffect then
+            self.BlurEffect:Destroy()
+            self.BlurEffect = nil
+        end
+    end)
     
     -- Clean up tables
     self.Elements = nil
     self.Tabs = nil
+    self.Colors = nil
+    self.Config = nil
 end
 
 return NexusUI
