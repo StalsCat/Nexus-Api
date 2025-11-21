@@ -300,13 +300,12 @@ function NexusUI:CreateMainUI()
     
     if not self.ScreenGui then error("Failed to create ScreenGui") end
     
-    -- Create Main Window
     self.MainWindow = safeCreateInstance("Frame", {
         Name = "MainWindow",
         Size = self.Config.WindowSize,
         Position = UDim2.new(0.5, -self.Config.WindowSize.X.Offset/2, 0.5, -self.Config.WindowSize.Y.Offset/2),
         BackgroundColor3 = safeGetColor(self.Colors, "Background"),
-        BackgroundTransparency = 1,
+        BackgroundTransparency = 0,
         Visible = false,
         Parent = self.ScreenGui
     })
@@ -1291,3 +1290,4 @@ function NexusUI:Destroy()
 end
 
 return NexusUI
+
