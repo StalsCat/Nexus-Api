@@ -1,5 +1,6 @@
 -- NexusUI Library v1.0 - Исправленная версия
 -- By StalsCat, ZestyKJScripts
+-- Исправления и улучшения: Assistant
 
 local NexusUI = {}
 NexusUI.__index = NexusUI
@@ -10,7 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService") -- Для GrabKeyFromSite
+local HttpService = game:GetService("HttpService")
 
 -- Default configurations
 NexusUI.DefaultConfig = {
@@ -68,25 +69,25 @@ local function validateConfig(config, configType)
     if config == nil then return false, configType .. " configuration is nil" end
     if type(config) ~= "table" then return false, configType .. " configuration must be a table, got " .. type(config) end
     if configType == "section" then
-        if not config.Name then return false, "Section name is required" end -- Исправлено: было config.Name
+        if not config.Name then return false, "Section name is required" end
         if type(config.Name) ~= "string" then return false, "Section name must be a string, got " .. type(config.Name) end
         if config.Name == "" then return false, "Section name cannot be empty" end
     elseif configType == "tab" then
-        if not config.Name then return false, "Tab name is required" end -- Исправлено: было config.Name
+        if not config.Name then return false, "Tab name is required" end
         if type(config.Name) ~= "string" then return false, "Tab name must be a string, got " .. type(config.Name) end
         if config.Name == "" then return false, "Tab name cannot be empty" end
     elseif configType == "button" then
-        if not config.Name then return false, "Button name is required" end -- Исправлено: было config.Name
+        if not config.Name then return false, "Button name is required" end
         if type(config.Name) ~= "string" then return false, "Button name must be a string, got " .. type(config.Name) end
         if config.Name == "" then return false, "Button name cannot be empty" end
         if config.Callback and type(config.Callback) ~= "function" then return false, "Button callback must be a function" end
     elseif configType == "toggle" then
-        if not config.Name then return false, "Toggle name is required" end -- Исправлено: было config.Name
+        if not config.Name then return false, "Toggle name is required" end
         if type(config.Name) ~= "string" then return false, "Toggle name must be a string, got " .. type(config.Name) end
         if config.Name == "" then return false, "Toggle name cannot be empty" end
         if config.Callback and type(config.Callback) ~= "function" then return false, "Toggle callback must be a function" end
     elseif configType == "label" then
-        if not config.Text then return false, "Label text is required" end -- Исправлено: было config.Text
+        if not config.Text then return false, "Label text is required" end
         if type(config.Text) ~= "string" then return false, "Label text must be a string, got " .. type(config.Text) end
         if config.Text == "" then return false, "Label text cannot be empty" end
     end
@@ -95,11 +96,10 @@ end
 
 local function stringToKeyCode(keyString)
     if keyString == nil then return Enum.KeyCode.Insert end
-    local keyCodeEnum = Enum.KeyCode[keyString] -- Сначала получаем enum
-    if keyCodeEnum then -- Проверяем, существует ли он
-        return keyCodeEnum
+    if type(keyString) == "string" then
+        local success, keyCode = pcall(function() return Enum.KeyCode[keyString] end)
+        if success and keyCode then return keyCode end
     end
-    -- Если строка не нашлась, проверяем, является ли сам аргумент enum
     if typeof(keyString) == "EnumItem" and keyString.EnumType == Enum.KeyCode then
         return keyString
     end
@@ -111,7 +111,7 @@ local function safeCreateInstance(className, properties)
         local inst = Instance.new(className)
         if properties then
             for property, value in pairs(properties) do
-                pcall(function() inst[property] = value end) -- Защита от ошибок установки свойства
+                pcall(function() inst[property] = value end)
             end
         end
         return inst
@@ -143,11 +143,10 @@ function NexusUI.new(config)
                 SaveKey = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.SaveKey) == "boolean" and config.KeySystem.KeySettings.SaveKey or false,
                 GrabKeyFromSite = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.GrabKeyFromSite) == "boolean" and config.KeySystem.KeySettings.GrabKeyFromSite or false,
                 Key = config.KeySystem and config.KeySystem.KeySettings and type(config.KeySystem.KeySettings.Key) == "table" and config.KeySystem.KeySettings.Key or {"DemoKey-1234-5678-9012"},
-                KeysFromSite = config.KeySystem and config.KeySystem.KeySettings and config.KeySystem.KeySettings.KeysFromSite or {} -- Добавлено, по умолчанию пустой массив
+                KeysFromSite = config.KeySystem and config.KeySystem.KeySettings and config.KeySystem.KeySettings.KeysFromSite
             },
             CurrentKey = nil,
-            KeyValidated = false,
-            FetchedKeys = {} -- Добавлено для хранения ключей с сайта
+            KeyValidated = false
         },
         Elements = {},
         Tabs = {},
@@ -171,29 +170,21 @@ end
 -- Key System Implementation
 function NexusUI:LoadSavedKey()
     if not self.KeySystem.KeySettings.SaveKey then return false end
-    -- Проверяем существование и тип readfile
-    if not readfile or type(readfile) ~= "function" then
-        warn("NexusUI: readfile is not available.")
-        return false
-    end
-
-    local fileName = self.KeySystem.KeySettings.FileName .. ".txt"
     local success, savedKey = pcall(function()
-        -- Теперь безопасно вызываем readfile
-        if isfile and isfile(fileName) then
-            return readfile(fileName)
+        if readfile and type(readfile) == "function" then
+            local fileName = self.KeySystem.KeySettings.FileName .. ".txt"
+            if isfile and isfile(fileName) then
+                return readfile(fileName)
+            end
         end
         return nil
     end)
-
     if success and savedKey and type(savedKey) == "string" then
         if self:ValidateKey(savedKey) then
             self.KeySystem.CurrentKey = savedKey
             self.KeySystem.KeyValidated = true
             return true
         end
-    else
-        warn("NexusUI: Failed to load key from file or file does not exist. Error: " .. (type(savedKey) == "string" and "File loaded but validation failed" or tostring(savedKey)))
     end
     return false
 end
@@ -201,57 +192,21 @@ end
 function NexusUI:SaveKeyToFile(key)
     if not self.KeySystem.KeySettings.SaveKey then return false end
     if not key or type(key) ~= "string" then return false end
-    -- Проверяем существование и тип writefile
-    if not writefile or type(writefile) ~= "function" then
-        warn("NexusUI: writefile is not available.")
-        return false
-    end
-
     local success = pcall(function()
-        writefile(self.KeySystem.KeySettings.FileName .. ".txt", key)
-    end)
-    if not success then
-        warn("NexusUI: Failed to save key to file.")
+        if writefile and type(writefile) == "function" then
+            writefile(self.KeySystem.KeySettings.FileName .. ".txt", key)
+            return true
+        end
         return false
-    end
-    return true
-end
-
-
-function NexusUI:FetchKeysFromSite() -- Новая функция для получения ключей с сайта
-    if not self.KeySystem.KeySettings.GrabKeyFromSite then return {} end
-    if not HttpService then
-        warn("NexusUI: HttpService is not available for fetching keys.")
-        return {}
-    end
-
-    local url = self.KeySystem.KeySettings.KeysFromSite -- Предполагаем, что это URL
-    if not url or type(url) ~= "string" then
-        warn("NexusUI: KeysFromSite URL is not provided or invalid.")
-        return {}
-    end
-
-    local success, response = pcall(function()
-        return HttpService:JSONDecode(HttpService:GetAsync(url))
     end)
-
-    if success and response and type(response) == "table" then
-        self.KeySystem.FetchedKeys = response -- Сохраняем полученные ключи
-        return response
-    else
-        warn("NexusUI: Failed to fetch keys from site or response is invalid. Error: " .. tostring(response))
-        return {}
-    end
+    return success
 end
 
 function NexusUI:ValidateKey(inputKey)
     if not inputKey or type(inputKey) ~= "string" then return false end
     inputKey = string.upper(inputKey:gsub("%s+", ""))
-
-    -- Если включена загрузка с сайта, используем полученные ключи
-    local validKeys = self.KeySystem.KeySettings.GrabKeyFromSite and self.KeySystem.FetchedKeys or self.KeySystem.KeySettings.Key
+    local validKeys = self.KeySystem.KeySettings.Key
     if not validKeys or type(validKeys) ~= "table" then return false end
-
     for _, validKey in ipairs(validKeys) do
         if type(validKey) == "string" and string.upper(validKey:gsub("%s+", "")) == inputKey then
             return true
@@ -259,7 +214,6 @@ function NexusUI:ValidateKey(inputKey)
     end
     return false
 end
-
 
 -- UI Creation
 function NexusUI:Initialize()
@@ -269,10 +223,6 @@ function NexusUI:Initialize()
         self:CreateMainUI()
         self:SetupEventHandlers()
         if self.KeySystem.Enabled then
-            if self.KeySystem.KeySettings.GrabKeyFromSite then
-                -- Попробовать получить ключи с сайта перед проверкой сохраненного
-                self:FetchKeysFromSite()
-            end
             if self:LoadSavedKey() then
                 self:ShowMainUI()
             else
@@ -314,7 +264,7 @@ function NexusUI:CreateMainUI()
         Name = "NexusUIModern",
         Parent = CoreGui,
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-        ResetOnSpawn = false, -- Исправление: Добавлено
+        ResetOnSpawn = false,
         Enabled = false
     })
     if not self.ScreenGui then error("Failed to create ScreenGui") end
@@ -396,7 +346,7 @@ function NexusUI:CreateMainUI()
     -- Navigation
     self.NavigationList = safeCreateInstance("ScrollingFrame", {
         Name = "NavigationList",
-        Size = UDim2.new(1, -20, 1, -100),
+        Size = UDim2.new(1, -20, 1, -150), -- Исправлено: -150 вместо -100
         Position = UDim2.new(0, 10, 0, 10),
         BackgroundTransparency = 1,
         ScrollBarThickness = 4,
@@ -414,7 +364,7 @@ function NexusUI:CreateMainUI()
     self.ProfileSection = safeCreateInstance("Frame", {
         Name = "ProfileSection",
         Size = UDim2.new(1, -20, 0, 80),
-        Position = UDim2.new(0, 10, 1, -90),
+        Position = UDim2.new(0, 10, 0, 0), -- Исправлено: позиция вверху
         BackgroundColor3 = safeGetColor(self.Colors, "SurfaceLight"),
         Parent = self.Sidebar
     })
@@ -483,14 +433,79 @@ function NexusUI:CreateMainUI()
     self.dragInput = nil
     self.dragStart = nil
     self.startPos = nil
+
+    -- Привязка размеров к изменениям MainWindow
+    self.MainWindow:GetPropertyChangedSignal("Size"):Connect(function()
+        self.TopBar.Size = UDim2.new(1, 0, 0, 40)
+        self.MainContent.Size = UDim2.new(1, 0, 1, -40)
+        self.Sidebar.Size = UDim2.new(0, 200, 1, 0)
+        self.ContentPages.Size = UDim2.new(1, -200, 1, 0)
+    end)
+
+    -- Привязка размеров к изменениям Sidebar
+    self.Sidebar:GetPropertyChangedSignal("Size"):Connect(function()
+        self.NavigationList.Size = UDim2.new(1, -20, 1, -150)
+        self.ProfileSection.Size = UDim2.new(1, -20, 0, 80)
+    end)
+
+    -- Привязка размеров к изменениям KeySystemUI
+    if self.KeySystemUI then
+        self.KeySystemUI:GetPropertyChangedSignal("Size"):Connect(function()
+            local size = self.KeySystemUI.Size
+            local width = size.X.Offset
+            local height = size.Y.Offset
+            local titleHeight = 80
+            local subtitleHeight = 30
+            local inputHeight = 45
+            local submitHeight = 45
+            local noteHeight = 40
+            local statusHeight = 20
+            local totalHeight = titleHeight + subtitleHeight + inputHeight + submitHeight + noteHeight + statusHeight
+
+            local keyTitle = self.KeySystemUI:FindFirstChild("KeyTitle")
+            if keyTitle then
+                keyTitle.Size = UDim2.new(1, 0, 0, titleHeight)
+            end
+
+            local keySubtitle = self.KeySystemUI:FindFirstChild("KeySubtitle")
+            if keySubtitle then
+                keySubtitle.Size = UDim2.new(1, -40, 0, subtitleHeight)
+                keySubtitle.Position = UDim2.new(0, 20, 0, titleHeight)
+            end
+
+            local keyInput = self.KeySystemUI:FindFirstChild("KeyInput")
+            if keyInput then
+                keyInput.Size = UDim2.new(1, -40, 0, inputHeight)
+                keyInput.Position = UDim2.new(0, 20, 0, titleHeight + subtitleHeight)
+            end
+
+            local keySubmit = self.KeySystemUI:FindFirstChild("KeySubmit")
+            if keySubmit then
+                keySubmit.Size = UDim2.new(1, -40, 0, submitHeight)
+                keySubmit.Position = UDim2.new(0, 20, 0, titleHeight + subtitleHeight + inputHeight)
+            end
+
+            local keyNote = self.KeySystemUI:FindFirstChild("KeyNote")
+            if keyNote then
+                keyNote.Size = UDim2.new(1, -40, 0, noteHeight)
+                keyNote.Position = UDim2.new(0, 20, 1, -noteHeight - 20)
+            end
+
+            local keyStatus = self.KeySystemUI:FindFirstChild("KeyStatus")
+            if keyStatus then
+                keyStatus.Size = UDim2.new(1, -40, 0, statusHeight)
+                keyStatus.Position = UDim2.new(0, 20, 0, titleHeight + subtitleHeight + inputHeight + submitHeight)
+            end
+        end)
+    end
 end
 
 function NexusUI:CreateKeySystem()
     if self.Destroyed then return end
     self.KeySystemUI = safeCreateInstance("Frame", {
         Name = "KeySystem",
-        Size = UDim2.new(0, 450, 0, 400),
-        Position = UDim2.new(0.5, -225, 0.5, -200),
+        Size = UDim2.new(0.5, 0, 0.5, 0), -- Исправлено: относительный размер
+        Position = UDim2.new(0.5, -225, 0.5, -200), -- Исправлено: позиция по центру
         BackgroundColor3 = safeGetColor(self.Colors, "Background"),
         BackgroundTransparency = 1,
         Visible = false,
@@ -644,7 +659,7 @@ function NexusUI:SetupEventHandlers()
     end)
 
     -- Player cleanup
-    if Players.LocalPlayer then -- Исправление: Проверка на nil
+    if Players.LocalPlayer then
         Players.LocalPlayer.AncestryChanged:Connect(function(_, parent)
             if not parent then self:Destroy() end
         end)
@@ -652,7 +667,7 @@ function NexusUI:SetupEventHandlers()
 end
 
 function NexusUI:SafeTween(object, tweenInfo, properties)
-    if self.Destroyed then return nil end -- Исправление: Проверка Destroyed
+    if self.Destroyed then return nil end
     if not object or not object.Parent then return nil end
     if not tweenInfo or type(tweenInfo) ~= "TweenInfo" then return nil end
     if not properties or type(properties) ~= "table" then return nil end
@@ -676,7 +691,7 @@ end
 -- Tab Management
 function NexusUI:CreateTab(tabConfig)
     if self.Destroyed then return nil end
-    local isValid, errorMsg = validateConfig(tabConfig, "tab") -- Исправление: было "tab"
+    local isValid, errorMsg = validateConfig(tabConfig, "tab")
     if not isValid then
         warn("NexusUI: " .. errorMsg)
         return nil
@@ -717,7 +732,7 @@ function NexusUI:CreateTab(tabConfig)
     local tabAPI = {}
     function tabAPI.AddButton(buttonConfig)
         if self.Destroyed then return nil end
-        local isValid, err = validateConfig(buttonConfig, "button") -- Исправление: было "button"
+        local isValid, err = validateConfig(buttonConfig, "button")
         if not isValid then
             warn("NexusUI: " .. err)
             return nil
@@ -735,7 +750,7 @@ function NexusUI:CreateTab(tabConfig)
 
     function tabAPI.AddToggle(toggleConfig)
         if self.Destroyed then return nil end
-        local isValid, err = validateConfig(toggleConfig, "toggle") -- Исправление: было "toggle"
+        local isValid, err = validateConfig(toggleConfig, "toggle")
         if not isValid then
             warn("NexusUI: " .. err)
             return nil
@@ -753,7 +768,7 @@ function NexusUI:CreateTab(tabConfig)
 
     function tabAPI.AddSection(sectionConfig)
         if self.Destroyed then return nil end
-        local isValid, err = validateConfig(sectionConfig, "section") -- Исправление: было "section"
+        local isValid, err = validateConfig(sectionConfig, "section")
         if not isValid then
             warn("NexusUI: " .. err)
             return nil
@@ -771,7 +786,7 @@ function NexusUI:CreateTab(tabConfig)
 
     function tabAPI.AddLabel(labelConfig)
         if self.Destroyed then return nil end
-        local isValid, err = validateConfig(labelConfig, "label") -- Исправление: было "label"
+        local isValid, err = validateConfig(labelConfig, "label")
         if not isValid then
             warn("NexusUI: " .. err)
             return nil
@@ -868,7 +883,6 @@ function NexusUI:CreateContentPage(pageConfig)
 end
 
 function NexusUI:SelectTab(tabName)
-    if self.Destroyed then return end -- Исправление: Проверка Destroyed
     if not self.Tabs[tabName] then return end
 
     for name, tab in pairs(self.Tabs) do
@@ -892,7 +906,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
         warn("NexusUI: Tab not found: " .. tostring(tabName))
         return nil
     end
-    local isValid, errorMsg = validateConfig(sectionConfig, "section") -- Исправление: было "section"
+    local isValid, errorMsg = validateConfig(sectionConfig, "section")
     if not isValid then
         warn("NexusUI: " .. errorMsg)
         return nil
@@ -903,7 +917,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     -- Создаем секцию
     local section = safeCreateInstance("Frame", {
         Name = sectionConfig.Name .. "Section",
-        Size = UDim2.new(1, 0, 0, 50), -- Начальный размер
+        Size = UDim2.new(1, 0, 0, 50),
         BackgroundColor3 = safeGetColor(self.Colors, "Surface"),
         BackgroundTransparency = 0,
         Parent = tab.Page
@@ -933,8 +947,8 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     -- Контентная область
     local content = safeCreateInstance("Frame", {
         Name = "Content",
-        Size = UDim2.new(1, -20, 0, 0), -- Высота будет меняться
-        Position = UDim2.new(0, 15, 0, 40), -- Ниже заголовка
+        Size = UDim2.new(1, -20, 0, 0),
+        Position = UDim2.new(0, 15, 0, 40),
         BackgroundTransparency = 1,
         Parent = section
     })
@@ -951,9 +965,9 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
 
     -- Автоматическое изменение размера
     contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        if content and content.Parent then -- Исправление: Проверка на nil
+        if content and content.Parent then
             content.Size = UDim2.new(1, -20, 0, contentLayout.AbsoluteContentSize.Y)
-            section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y) -- 55 = 15 (отступ) + 25 (заголовок) + 15 (отступ)
+            section.Size = UDim2.new(1, 0, 0, 55 + contentLayout.AbsoluteContentSize.Y)
         end
     end)
 
@@ -968,7 +982,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     local sectionAPI = {}
     function sectionAPI.AddButton(buttonConfig)
         if self.Destroyed then return nil end
-        local isValid, err = validateConfig(buttonConfig, "button") -- Исправление: добавлена проверка
+        local isValid, err = validateConfig(buttonConfig, "button")
         if not isValid then
             warn("NexusUI: " .. err)
             return nil
@@ -977,7 +991,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     end
     function sectionAPI.AddToggle(toggleConfig)
         if self.Destroyed then return nil end
-        local isValid, err = validateConfig(toggleConfig, "toggle") -- Исправление: добавлена проверка
+        local isValid, err = validateConfig(toggleConfig, "toggle")
         if not isValid then
             warn("NexusUI: " .. err)
             return nil
@@ -986,7 +1000,7 @@ function NexusUI:AddSectionToTab(tabName, sectionConfig)
     end
     function sectionAPI.AddLabel(labelConfig)
         if self.Destroyed then return nil end
-        local isValid, err = validateConfig(labelConfig, "label") -- Исправление: добавлена проверка
+        local isValid, err = validateConfig(labelConfig, "label")
         if not isValid then
             warn("NexusUI: " .. err)
             return nil
@@ -998,7 +1012,7 @@ end
 
 -- Element Creation
 function NexusUI:CreateButton(parent, buttonConfig)
-    if self.Destroyed then return nil end -- Исправление: Проверка Destroyed
+    if self.Destroyed then return nil end
     if not parent then return nil end
     local button = safeCreateInstance("TextButton", {
         Name = buttonConfig.Name .. "Button",
@@ -1042,7 +1056,7 @@ function NexusUI:CreateButton(parent, buttonConfig)
 end
 
 function NexusUI:CreateToggle(parent, toggleConfig)
-    if self.Destroyed then return nil end -- Исправление: Проверка Destroyed
+    if self.Destroyed then return nil end
     if not parent then return nil end
     local toggleFrame = safeCreateInstance("Frame", {
         Name = toggleConfig.Name .. "Toggle",
@@ -1105,7 +1119,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
 
     return {
         SetState = function(newState)
-            if self.Destroyed then return end -- Исправление: Проверка Destroyed
+            if self.Destroyed then return end
             state = newState
             toggleIndicator.Visible = state
             if state then
@@ -1123,7 +1137,7 @@ function NexusUI:CreateToggle(parent, toggleConfig)
 end
 
 function NexusUI:CreateLabel(parent, labelConfig)
-    if self.Destroyed then return nil end -- Исправление: Проверка Destroyed
+    if self.Destroyed then return nil end
     if not parent then return nil end
     local label = safeCreateInstance("TextLabel", {
         Name = "Label",
@@ -1141,20 +1155,20 @@ function NexusUI:CreateLabel(parent, labelConfig)
 end
 
 function NexusUI:AddButtonToTab(tabName, buttonConfig)
-    if self.Destroyed then return nil end -- Исправление: Проверка Destroyed
-    if not self.Tabs[tabName] then return nil end
+    if self.Destroyed then return nil end
+    if not self.Tabs[tabName] or not self.Tabs[tabName].Page then return nil end
     return self:CreateButton(self.Tabs[tabName].Page, buttonConfig)
 end
 
 function NexusUI:AddToggleToTab(tabName, toggleConfig)
-    if self.Destroyed then return nil end -- Исправление: Проверка Destroyed
-    if not self.Tabs[tabName] then return nil end
+    if self.Destroyed then return nil end
+    if not self.Tabs[tabName] or not self.Tabs[tabName].Page then return nil end
     return self:CreateToggle(self.Tabs[tabName].Page, toggleConfig)
 end
 
 function NexusUI:AddLabelToTab(tabName, labelConfig)
-    if self.Destroyed then return nil end -- Исправление: Проверка Destroyed
-    if not self.Tabs[tabName] then return nil end
+    if self.Destroyed then return nil end
+    if not self.Tabs[tabName] or not self.Tabs[tabName].Page then return nil end
     return self:CreateLabel(self.Tabs[tabName].Page, labelConfig)
 end
 
@@ -1176,7 +1190,7 @@ function NexusUI:HideKeySystem()
         BackgroundTransparency = 1
     })
     delay(self.Config.AnimationDuration, function()
-        if self.KeySystemUI then -- Исправление: Проверка на nil
+        if self.KeySystemUI then
             self.KeySystemUI.Visible = false
         end
     end)
@@ -1204,7 +1218,7 @@ function NexusUI:OnKeySubmit()
             self:SaveKeyToFile(inputKey)
         end
         delay(1, function()
-            if self.Destroyed then return end -- Исправление: Проверка Destroyed перед выполнением
+            if self.Destroyed then return end
             self:HideKeySystem()
             self:ShowMainUI()
         end)
@@ -1255,7 +1269,7 @@ function NexusUI:HideMainUI()
     })
     self:SafeTween(self.BlurEffect, TweenInfo.new(0.3), {Size = 0})
     delay(self.Config.AnimationDuration, function()
-        if self.Destroyed then return end -- Исправление: Проверка Destroyed перед выполнением
+        if self.Destroyed then return end
         if self.MainWindow then
             self.MainWindow.Visible = false
         end
